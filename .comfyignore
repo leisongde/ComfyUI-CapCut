@@ -1,0 +1,4 @@
+# Development files are kept on GitHub and excluded from Registry packages.
+.github/
+tests/
+node.zip

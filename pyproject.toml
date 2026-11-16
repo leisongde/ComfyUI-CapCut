@@ -1,0 +1,22 @@
+[project]
+name = "comfyui-capcut"
+version = "0.1.0"
+description = "ComfyUI video editing studio with multi-track editing, MiniMax H3 generation, character replacement, body rendering, and motion transfer."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = [
+    "transformers>=5.6.0,<6",
+    "safetensors>=0.6.2",
+    "numpy>=1.26,<3",
+    "av>=14",
+]
+
+[project.urls]
+Repository = "https://github.com/leisongde/ComfyUI-CapCut"
+Documentation = "https://github.com/leisongde/ComfyUI-CapCut#readme"
+Issues = "https://github.com/leisongde/ComfyUI-CapCut/issues"
+
+[tool.comfy]
+PublisherId = "leisongde"
+DisplayName = "ComfyUI-CapCut"

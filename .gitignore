@@ -15,6 +15,7 @@ node_modules/
 .vite/
 coverage/
 *.tsbuildinfo
+/node.zip
 
 # Local runs, media, and browser automation artifacts
 /output/
