@@ -1,0 +1,234 @@
+{
+  "8": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": [
+        "7",
+        0
+      ],
+      "conditioning": [
+        "6",
+        0
+      ]
+    }
+  },
+  "9": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 375540071883589
+    }
+  },
+  "16": {
+    "class_type": "ResolutionSelector",
+    "inputs": {
+      "aspect_ratio": "16:9 (Widescreen)",
+      "megapixels": 0.4,
+      "multiple": 32
+    }
+  },
+  "5": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax\\minimax_h3_audio_vae_fp32.safetensors"
+    }
+  },
+  "4": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax\\minimax_h3_video_vae_fp16.safetensors"
+    }
+  },
+  "3": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    }
+  },
+  "10": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "9",
+        0
+      ],
+      "guider": [
+        "8",
+        0
+      ],
+      "sampler": [
+        "7",
+        1
+      ],
+      "sigmas": [
+        "7",
+        2
+      ],
+      "latent_image": [
+        "6",
+        1
+      ]
+    }
+  },
+  "11": {
+    "class_type": "MiniMaxH3AVDecodeT8",
+    "inputs": {
+      "av_latent": [
+        "10",
+        0
+      ],
+      "video_vae": [
+        "4",
+        0
+      ],
+      "audio_vae": [
+        "5",
+        0
+      ]
+    }
+  },
+  "15": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+      "values.a": [
+        "14",
+        0
+      ]
+    }
+  },
+  "12": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "frame_rate": 24,
+      "loop_count": 0,
+      "filename_prefix": "MiniMaxH3/stable_4v4a",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": false,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "images": [
+        "11",
+        0
+      ],
+      "audio": [
+        "11",
+        1
+      ]
+    }
+  },
+  "7": {
+    "class_type": "MiniMaxH3DualClockSamplerT8",
+    "inputs": {
+      "steps": 8,
+      "shift_video": 12,
+      "shift_audio": 3,
+      "sampler_name": "dual_clock_euler",
+      "scheduler": "native_flow",
+      "model": [
+        "78",
+        0
+      ],
+      "av_latent": [
+        "6",
+        1
+      ]
+    }
+  },
+  "14": {
+    "class_type": "PrimitiveFloat",
+    "inputs": {
+      "value": 15
+    }
+  },
+  "6": {
+    "class_type": "MiniMaxH3AudioConditioningT8",
+    "inputs": {
+      "width": [
+        "16",
+        0
+      ],
+      "height": [
+        "16",
+        1
+      ],
+      "length": [
+        "15",
+        1
+      ],
+      "task_type": "T2VA",
+      "audio_mode": "native",
+      "audio_denoise_strength": 1,
+      "add_source_as_reference": false,
+      "prompt_primary_audio_ordinal": 0,
+      "strict_prompt_tags": true,
+      "ref_image_size": "match",
+      "reference_video_policy": "official_2_to_15s",
+      "clip": [
+        "3",
+        0
+      ],
+      "video_vae": [
+        "4",
+        0
+      ],
+      "audio_vae": [
+        "5",
+        0
+      ],
+      "prompt": ""
+    }
+  },
+  "62": {
+    "class_type": "MiniMaxH3HybridLoader",
+    "inputs": {
+      "base_model": "minimax\\minimax_h3_fl2va_pruned_fp8_scaled.safetensors",
+      "overlay_model": "minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+      "overlay_preset": "block_range_adaln",
+      "block_range_start": 25,
+      "block_range_end": 49,
+      "final_adaln_from_overlay": false,
+      "custom_overlays": "",
+      "custom_base": "",
+      "weight_dtype": "default"
+    }
+  },
+  "73": {
+    "class_type": "MiniMaxH3PromptSkill",
+    "inputs": {
+      "API 密钥": "",
+      "官方 Skill": "MiniMax H3 提示词编写 [write-seedance-video-prompts]",
+      "导演": "文戏表演",
+      "动作强度": "R2 商业高燃（默认）",
+      "模型": "gpt-6-sol",
+      "H3 模式": "Ref2VA（多参考素材生成视频）",
+      "补充上下文": "",
+      "额外要求": "",
+      "用户提示词": ""
+    }
+  },
+  "78": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "lora_name": "minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "17",
+        0
+      ]
+    }
+  },
+  "17": {
+    "class_type": "MiniMaxH3MemoryEfficientSageAttentionPatch",
+    "inputs": {
+      "model": [
+        "62",
+        0
+      ]
+    }
+  }
+}

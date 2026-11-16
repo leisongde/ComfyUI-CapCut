@@ -1,0 +1,60 @@
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Frontend dependencies and tool caches
+node_modules/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# Local runs, media, and browser automation artifacts
+/output/
+/input/
+/user/
+/models/
+/temp/
+.playwright-cli/
+playwright-report/
+test-results/
+*.log
+*.pid
+
+# Local secrets (example environment files may be published)
+.env
+.env.*
+!.env.example
+!.env.*.example
+.npmrc
+minimax-key.json
+motion-transfer-key.json
+credentials.json
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+
+# Editor, operating system, and temporary files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+*.bak
+*.tmp
+
+# Keep editor_dist/, frontend/public/models/, and vendor/ in the repository:
+# they contain the browser editor, required runtime assets, and licensed sources.

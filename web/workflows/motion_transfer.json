@@ -1,0 +1,379 @@
+{
+  "2": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax\\minimax_h3_video_vae_fp16.safetensors"
+    }
+  },
+  "4": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax\\minimax_h3_audio_vae_fp32.safetensors"
+    }
+  },
+  "5": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "3": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    }
+  },
+  "7": {
+    "class_type": "MiniMaxH3SigmaShift",
+    "inputs": {
+      "model": [
+        "5",
+        0
+      ],
+      "shift_video": 12,
+      "shift_audio": 3
+    }
+  },
+  "8": {
+    "class_type": "ModelAttentionBackend",
+    "inputs": {
+      "model": [
+        "7",
+        0
+      ],
+      "attention": "comfy kitchen attention"
+    }
+  },
+  "9": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "8",
+        0
+      ],
+      "lora_name": "minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",
+      "strength_model": 1
+    }
+  },
+  "6": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "9",
+        0
+      ],
+      "lora_name": "minimax\\Motion_Repair_V2.safetensors",
+      "strength_model": 0.35
+    }
+  },
+  "13": {
+    "class_type": "ModelPreviewOverrideKJ",
+    "inputs": {
+      "model": [
+        "6",
+        0
+      ],
+      "max_resolution": 1024,
+      "jpeg_quality": 80,
+      "suppress_default_preview": true,
+      "preview_frames": [
+        "218",
+        1
+      ],
+      "preview_fps": 12,
+      "tiny_vae": "taeh3.safetensors"
+    }
+  },
+  "11": {
+    "class_type": "BlockSparseAttention",
+    "inputs": {
+      "model": [
+        "13",
+        0
+      ],
+      "selection": "sol-attn",
+      "selection.tau": 1.1,
+      "start_percent": 0.2,
+      "end_percent": 1,
+      "dense_blocks": "",
+      "min_tokens": 12288,
+      "extra_tokens": 256,
+      "sink_conditioning": "exact_kv_and_rows",
+      "verbose": false
+    }
+  },
+  "12": {
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "inputs": {
+      "clip": [
+        "3",
+        0
+      ],
+      "vae": [
+        "2",
+        0
+      ],
+      "audio_vae": [
+        "4",
+        0
+      ],
+      "prompt": "",
+      "width": [
+        "39",
+        0
+      ],
+      "height": [
+        "39",
+        1
+      ],
+      "length": [
+        "218",
+        1
+      ],
+      "ref_image_size": "match",
+      "ref_images.ref_image_0": [
+        "229",
+        0
+      ],
+      "ref_videos.ref_video_0": [
+        "32",
+        0
+      ]
+    }
+  },
+  "21": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "12",
+        0
+      ]
+    }
+  },
+  "26": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    }
+  },
+  "27": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "model": [
+        "11",
+        0
+      ],
+      "scheduler": "simple",
+      "steps": 8,
+      "denoise": 1
+    }
+  },
+  "39": {
+    "class_type": "ResolutionSelector",
+    "inputs": {
+      "aspect_ratio": "9:16 (Portrait Widescreen)",
+      "megapixels": 0.4,
+      "multiple": 32
+    }
+  },
+  "32": {
+    "class_type": "LayerUtility: ImageScaleByAspectRatio V2",
+    "inputs": {
+      "image": [
+        "117",
+        0
+      ],
+      "aspect_ratio": "original",
+      "proportional_width": 1,
+      "proportional_height": 1,
+      "fit": "crop",
+      "method": "lanczos",
+      "round_to_multiple": "32",
+      "scale_to_side": "longest",
+      "scale_to_length": 736,
+      "background_color": "#000000"
+    }
+  },
+  "228": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": ""
+    }
+  },
+  "229": {
+    "class_type": "LayerUtility: ImageScaleByAspectRatio V2",
+    "inputs": {
+      "image": [
+        "228",
+        0
+      ],
+      "aspect_ratio": "original",
+      "proportional_width": 1,
+      "proportional_height": 1,
+      "fit": "crop",
+      "method": "lanczos",
+      "round_to_multiple": "32",
+      "scale_to_side": "longest",
+      "scale_to_length": 1536,
+      "background_color": "#000000"
+    }
+  },
+  "117": {
+    "class_type": "VHS_LoadVideo",
+    "inputs": {
+      "video": "",
+      "force_rate": 24,
+      "custom_width": 0,
+      "custom_height": 0,
+      "frame_load_cap": [
+        "218",
+        1
+      ],
+      "skip_first_frames": 0,
+      "select_every_nth": 1,
+      "format": "None"
+    }
+  },
+  "175": {
+    "class_type": "PrimitiveFloat",
+    "inputs": {
+      "value": 5
+    }
+  },
+  "218": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+      "values.a": [
+        "175",
+        0
+      ]
+    }
+  },
+  "50": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "a / 24",
+      "values.a": [
+        "218",
+        1
+      ]
+    }
+  },
+  "49": {
+    "class_type": "TrimAudioDuration",
+    "inputs": {
+      "audio": [
+        "117",
+        2
+      ],
+      "start_index": 0,
+      "duration": [
+        "50",
+        0
+      ]
+    }
+  },
+  "314": {
+    "class_type": "SamplerCustom",
+    "inputs": {
+      "model": [
+        "11",
+        0
+      ],
+      "add_noise": true,
+      "noise_seed": 0,
+      "cfg": 1,
+      "positive": [
+        "12",
+        0
+      ],
+      "negative": [
+        "21",
+        0
+      ],
+      "sampler": [
+        "26",
+        0
+      ],
+      "sigmas": [
+        "27",
+        0
+      ],
+      "latent_image": [
+        "12",
+        1
+      ]
+    }
+  },
+  "36": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "314",
+        0
+      ],
+      "vae": [
+        "2",
+        0
+      ]
+    }
+  },
+  "382": {
+    "class_type": "easy cleanGpuUsed",
+    "inputs": {
+      "anything": [
+        "36",
+        0
+      ]
+    }
+  },
+  "346": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": [
+        "382",
+        0
+      ],
+      "audio": [
+        "49",
+        0
+      ],
+      "frame_rate": 24,
+      "loop_count": 0,
+      "filename_prefix": "CapCut/MotionTransfer/result",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": false,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true
+    }
+  },
+  "368": {
+    "class_type": "ChatGPTImagePromptReverseGW",
+    "inputs": {
+      "image": [
+        "228",
+        0
+      ],
+      "api_key": "",
+      "reverse_instruction": "只输出一段英文，不加标题、解释、引号或占位符，建议 100–160 个英文单词。\n\n描述重点：\n1. 角色类别及视觉风格：真人、3D 玩偶、毛绒角色、卡通形象等，忠实于图片，不默认写实。\n2. 图片可见的原始身体比例：身体宽度相对高度、头相对身体大小、躯干长短与宽窄、肩腰臀形态、手臂和腿的长短粗细、手脚大小。优先用明确的视觉描述，如 oversized rounded head、wide compact torso、very short legs；按图片实际特征写，不套用固定形容词。\n3. 区分头部本体和耳朵、角、帽子等附属结构，避免把长耳朵算成头部高度。\n4. 身份特征、颜色、材质、发型或毛发、服装、鞋子及配饰。区分宽松衣服的外轮廓和真正可见的身体结构，不猜测被衣物遮住的身体尺寸。\n5. 将这些特征表述为贯穿动作全过程的固定角色设计，而非参考图当前姿势造成的偶然外观。\n\n不要描述当前动作、站姿、构图、镜头、背景或光线。不要加入理想身材、修长腿部、纤细腰部、标准人体比例等图片没有的特征。无法看清或被裁切的部位不要编造；不要虚构精确比例数字。不要写动画剧情、动作要求或否定词清单。\n\n固定开头：<Subject 1> is Character 1 from <Picture 1>, the complete replacement for the BLUE source performer (fixed source slot 1) in <Video 1>.\n\n固定开头之后紧接下面这句，再继续描述参考图角色的外观；不要从角色图片的构图推断视频中的站位：\nThis character inherits that performer's opening screen position, floor location, relative depth and continuous motion trajectory, and keeps the same identity throughout the shared group performance.\n颜色只用于绑定动作源，不能把目标角色涂成对应白模的颜色。多视图参考图中的正面、侧面、背面是同一个角色的多个视角，只描述一个角色。",
+      "system_prompt": "不要描述角色手里拿的物品及背包等装饰",
+      "model": "gpt-5.6-sol"
+    }
+  },
+  "376": {
+    "class_type": "ChatGPTPromptOptimizerGW",
+    "inputs": {
+      "api_key": "",
+      "user_prompt": "",
+      "system_prompt": "你是 MiniMax H3 多角色动作迁移提示词编排器。你的任务是根据输入的角色反推描述，确定本轮实际角色数量，并生成一份明确、简洁、可直接用于 H3 的英文视频提示词。\n\n只输出最终英文提示词，不输出分析、解释、Markdown代码框或额外标题。\n\n【人数与角色整理】\n\n1. 输入包含按参考图顺序排列的角色反推结果。一个有效角色条目代表一个目标角色，支持1–6个。\n2. 忽略空白、未启用、无描述的条目。不要把环境、背景人物、服饰、角色的多个视图算成额外角色。\n3. 同一个角色条目在输入中被重复引用时只统计一次；不同编号即使外观相似，也保留为独立角色。\n4. 将长篇反推描述压缩成能直接辨认角色的英文外观短语：角色类别、视觉风格、明显的原始体型比例、主要发型或毛发、标志性服装及配色。每个角色约12–25个英文单词。\n5. 忠实保留真人、3D、卡通、毛绒、拟人动物等原有类别和比例，不把非人类角色统一写成人类，不编造图片没有的外观。\n6. 最终提示词只写本轮实际人数和实际角色，不输出“N个人”“1–6人”“如果有某个角色”等通用判断规则，不保留占位符或未启用角色。\n\n【固定参考关系】\n\n角色1 → <Picture 1> → BLUE 蓝色白模。\n角色2 → <Picture 2> → RED 红色白模。\n角色3 → <Picture 3> → GREEN 绿色白模。\n角色4 → <Picture 4> → MAGENTA 品红／紫色白模。\n角色5 → <Picture 5> → CYAN 青色白模。\n角色6 → <Picture 6> → YELLOW 黄色白模。\n\n本轮使用前几个角色，就只在最终提示词中出现对应的参考图和颜色。不要把完整六色表照抄进人数不足六人的提示词。\n\n颜色是源动作人物的身份标识，不是目标人物的身体或服装颜色。目标外观来自各自的参考图。\n\n【明确开场站位】\n\n开场按固定颜色顺序，从观看画面的左侧到右侧排列：\n\n1人：角色1位于中间。\n2人：角色1在左，角色2在右。\n3人：角色1在左，角色2在中间，角色3在右。\n4人：角色1最左，角色2左中，角色3右中，角色4最右。\n5人：角色1最左，角色2左中，角色3中间，角色4右中，角色5最右。\n6人：角色1至角色6依次位于画面从左到右的六个位置。\n\n上述左右均指观看者视角。具体间距、地面位置和前后纵深继承 <Video 1>。\n\n站位描述必须直接写出各角色的外观短名，例如：\nthe pirate woman on screen-left, the silver-dressed woman in the middle, and the white-shirted woman on screen-right\n\n不要只写抽象的“角色1、角色2、角色3分别占位”。不要把身份绑定仅留在颜色说明里。\n\n开场之后，每个角色始终跟随自己原来对应颜色人物的运动轨迹。人物交叉、转身或遮挡后，不按新的左右顺序重新分配身份。\n\n【输出格式】\n\n严格按以下六个英文字段依次输出：\n\nsubject_definitions:\n逐个定义本轮实际角色：\n<Subject i> is [该角色的简短外观描述] from <Picture i>.\n紧接着明确该角色的开场位置，以及对应的白模颜色和完整动作轨迹。\n\n使用下一个未占用的 Subject 编号定义共享环境。用户明确指定场景时采用指定场景；否则使用 <Picture 1> 中的环境并扩展为容纳所有角色的连续空间。不要凭空指定输入未提供的具体场景。\n\n另外定义 <Video 1> 为本次需要编辑的白模源视频，明确它包含本轮实际数量的动作人物，并写清开场颜色排列。\n\nsummary:\n以 [video editing + reference generation] 开头。\n用一段简短英文明确：完整替换源视频中的全部对应人物，实际有几人，每个具体角色在什么位置，所有角色在同一个连续镜头内同时表演。\n\nretention_analysis:\n目标角色使用 fully_preserved，保留各自的身份、视觉风格、原始体型比例、材质和服装。\n<Video 1> 使用 attribute_transfer，继承同时发生的动作、轨迹、站位、间距、纵深和节奏，同时完整替换源人物外观。\n环境使用 attribute_transfer，统一背景、地面和光照。\n\ndetailed_description:\n以 [Shot 1] 开头，不添加时间戳。\n\n第一段直接描述最终画面：一个固定广角全身镜头，明确数量的不同角色已经同时站在同一地面上。按画面从左到右，再次直接点名各角色的外观短名和位置。构图容纳全部角色及完整动作范围。\n\n第二段明确动作关系：在相同的每一个时间点，每个角色跟随各自对应颜色的源动作人物，保留其头部、躯干、肢体、步伐、停顿、互动和运动路径。动作根据目标角色自身的身体结构进行迁移。\n\n第三段明确连续性：从开头就整体替换所有对应白模，整段保持同一组角色及各自身份。允许源视频原有的自然遮挡。角色参考图只提供外观，源视频提供全组动作与空间安排。\n\n使用正面、具体的最终画面描述。不要堆积大量否定句，不要写成执行算法或条件判断说明。不要安排角色依次介绍、轮流登场、中央人物依次换脸，或把其他白模保留为陪衬。\n\noverall_soundscape:\nNo additional speech or sound effects.\n\nnon_diegetic_music:\nN/A\n\n【最终检查】\n\n确保人数、角色定义数量、参考图编号、颜色对应和站位描述一致。\n确保 summary 和 detailed_description 都直接描述了具体角色同时出现在各自位置。\n确保没有引用未提供的参考图。\n尽量控制在约350–600个英文单词，人数较多时可适当增加，避免冗长重复的外观介绍。",
+      "model": "gpt-5.6-sol"
+    }
+  }
+}
