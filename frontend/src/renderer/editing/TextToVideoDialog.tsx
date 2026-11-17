@@ -92,7 +92,7 @@ export function TextToVideoDialog({ open, onOpenChange, mode, position, draftId,
       if (!connected) throw new Error('请在 ComfyUI 画布将“CapCut MiniMax H3 生视频”连接到主控台，再打开面板。')
       setValues({ ...Object.fromEntries(connected.fields.map(field => [field.name, field.default])), ...(videoEdit ? { prompt: '' } : {}), system_prompt: '不要背景音乐', enhance_prompt: 'on', ...initialValues, task_type: mode, prompt_api_key: saved.key })
     }).catch(error => { if (active) setError(error.message) }).finally(() => { if (active) setLoading(false) })
-    return () => { active = false; uploadRequest.current++ }
+    return () => { active = false; uploadRequest.current++; modelRequest.current++ }
   }, [open, draftId, mode])
 
   const field = (name: string) => module?.fields.find(item => item.name === name)
@@ -121,12 +121,12 @@ export function TextToVideoDialog({ open, onOpenChange, mode, position, draftId,
     } catch (error) { if (current === uploadRequest.current) setError((error as Error).message) }
     finally { if (current === uploadRequest.current) setUploading(false) }
   }
-  const refreshModels = async () => {
+  const refreshModels = async (automatic = false) => {
     const key = String(values.prompt_api_key ?? '').trim()
     if (!enhancementEnabled || !key || !module) return
     const current = ++modelRequest.current
     setLoadingModels(true)
-    setError('')
+    if (!automatic) setError('')
     try {
       const options = await request<string[]>('capcut:workflow-models' as never, { id: module.id, key })
       if (current !== modelRequest.current) return
@@ -136,6 +136,10 @@ export function TextToVideoDialog({ open, onOpenChange, mode, position, draftId,
       if (current === modelRequest.current) setError((error as Error).message)
     } finally { if (current === modelRequest.current) setLoadingModels(false) }
   }
+
+  useEffect(() => {
+    if (open && !loading && module && enhancementEnabled) void refreshModels(true)
+  }, [loading, module, enhancementEnabled])
 
   const saveKey = () => {
     const key = String(values.prompt_api_key ?? '').trim()

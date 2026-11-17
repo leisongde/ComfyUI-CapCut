@@ -40,9 +40,24 @@ export const fields = [
     { name: "prompt_api_key", label: "提示词增强 API 密钥", type: "password", default: "" },
 ];
 
+const nodeInputs = new Map();
+
+export function getWorkflowNodeInputs(nodeType) {
+    if (!nodeInputs.has(nodeType)) {
+        const pending = api.fetchApi(`/object_info/${encodeURIComponent(nodeType)}`).then(async response => {
+            if (!response.ok) throw new Error(`无法读取工作流选项（${response.status}）`);
+            return (await response.json())[nodeType]?.input;
+        }).catch(error => {
+            nodeInputs.delete(nodeType);
+            throw error;
+        });
+        nodeInputs.set(nodeType, pending);
+    }
+    return nodeInputs.get(nodeType);
+}
+
 export async function getFields(sourceFields = fields) {
-    const definitions = await api.getNodeDefs();
-    const inputs = definitions.MiniMaxH3PromptSkill?.input;
+    const inputs = await getWorkflowNodeInputs("MiniMaxH3PromptSkill");
     const names = { prompt_skill: "官方 Skill", prompt_director: "导演", prompt_intensity: "动作强度", prompt_model: "模型" };
     return sourceFields.map(field => {
         const name = names[field.name];

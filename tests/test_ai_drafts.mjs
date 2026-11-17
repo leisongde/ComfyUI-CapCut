@@ -936,6 +936,34 @@ test('current-shot generation runs only the clicked shot, restores live settings
     assert.ok(!JSON.stringify(env.planning()).includes('session-only-key'));
 });
 
+test('selected generation queues only checked shots in timeline order and waits for each result', async () => {
+    const importing = deferred(), imported = deferred();
+    const submissions = [];
+    const env = await setup({ ...values, task_type: 'T2VA', prompt: '' }, {
+        onRun: async payload => { submissions.push(payload.values.prompt); return [{ filename: 'result.mp4' }]; },
+        onImport: async () => { if (submissions.length === 1) { importing.resolve(); await imported.promise; } },
+    });
+    let planning = env.api.saveTextToVideoDraft(env.planning(), { startTime: 10, trackIndex: 0 }, { ...values, task_type: 'T2VA', prompt: 'checked later' });
+    const laterId = planning.selectedShotId;
+    planning = env.api.saveTextToVideoDraft(planning, { startTime: 0, trackIndex: 1 }, { ...values, task_type: 'T2VA', prompt: 'checked first' });
+    const firstId = planning.selectedShotId;
+    planning.scenes.at(-1).shots[0].generationStatus = 'succeeded';
+    env.setPlanning(planning);
+    await assert.rejects(env.api.generateAIShots(env.editor, []), /选择一个 AI 镜头/);
+    assert.equal(submissions.length, 0);
+    const progress = [];
+    const task = env.api.generateAIShots(env.editor, [laterId, firstId], value => progress.push(value));
+    await importing.promise;
+    assert.deepEqual(submissions, ['checked first']);
+    assert.equal(env.shot().generationStatus, 'idle');
+    imported.resolve();
+    assert.equal((await task).completed, 2);
+    assert.deepEqual(submissions, ['checked first', 'checked later']);
+    assert.deepEqual(Array.from(progress[0].shotIds), [firstId, laterId]);
+    assert.equal(env.shot().generationStatus, 'idle');
+    assert.equal(env.shot().outputVersions.length, 0);
+});
+
 test('batch includes completed shots, retries failed shots and skips incomplete drafts with a reason', async () => {
     const env = await setup({ ...values, task_type: 'T2VA' }, { onRun: async () => [{ filename: 'result.mp4' }] });
     let planning = structuredClone(env.planning());

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
-import { Activity, Box, Clapperboard, Images, ImagePlus, LoaderCircle, Play, Plus, Sparkles, Trash2, UserRound, Video, WandSparkles } from 'lucide-react'
+import { Activity, Box, Clapperboard, Images, ImagePlus, ListChecks, LoaderCircle, Play, Plus, Sparkles, Trash2, UserRound, Video, WandSparkles } from 'lucide-react'
 import { useEditor } from '@/hooks/use-editor'
 import type { EditorCore } from '@/core'
 import { Command } from '@/lib/commands/base-command'
@@ -51,6 +51,8 @@ export function AITracksPanel() {
   const [editingShotId, setEditingShotId] = useState<string>()
   const [contextShotId, setContextShotId] = useState<string>()
   const [queueProgress, setQueueProgress] = useState<ShotQueueProgress | null>(null)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [checkedShotIds, setCheckedShotIds] = useState<string[]>([])
   const [placement, setPlacement] = useState<{ shotId: string; startTime: number; duration: number; trackIndex: number } | null>(null)
   const drag = useRef<{ shot: EditingDirectorShot; x: number; y: number; scrollLeft: number; pointerId: number; projectId: string; side: 'move' | 'left' | 'right' } | null>(null)
   const viewport = useTimelineViewport()
@@ -71,12 +73,18 @@ export function AITracksPanel() {
   const editingScene = planning && editingShotId ? findDirectorScene(planning, editingShotId) : null
   const editingSlot = editingShotId ? getTextToVideoSlot(editor, editingShotId) : undefined
   const selectedShot = shots.find(shot => shot.id === planning?.selectedShotId)
+  const checkedShots = shots.filter(shot => checkedShotIds.includes(shot.id))
   const waitingShotIds = queueProgress?.shotIds.slice(queueProgress.index + 1) ?? []
   const anyGenerating = shots.some(shot => shot.generationStatus === 'queued' || shot.generationStatus === 'running')
   const busy = Boolean(queueProgress) || editingShot?.generationStatus === 'queued' || editingShot?.generationStatus === 'running'
   const activeRow = selected !== null && selected < trackCount ? selected : null
 
-  useEffect(() => { setQueueProgress(null); recoverTextToVideoGenerations(editor) }, [editor, project.metadata.id])
+  useEffect(() => {
+    setQueueProgress(null)
+    setSelectionMode(false)
+    setCheckedShotIds([])
+    recoverTextToVideoGenerations(editor)
+  }, [editor, project.metadata.id])
 
   useEffect(() => {
     const openSourceDraft = (event: Event) => {
@@ -212,8 +220,9 @@ export function AITracksPanel() {
     <header className="ai-tracks-header">
       <div><Clapperboard size={15} /><strong>AI 轨道</strong><span>{trackCount} 条轨道</span></div>
       <div>
+        <button type="button" aria-pressed={selectionMode} disabled={!shots.length || anyGenerating || Boolean(queueProgress)} title="勾选需要生成的 AI 片段，再点击生成已选" onClick={() => { setSelectionMode(!selectionMode); setCheckedShotIds([]) }}><ListChecks size={13} />{selectionMode ? '取消选择' : '选择生成'}</button>
         <button type="button" disabled={!selectedShot || anyGenerating || Boolean(queueProgress)} title={selectedShot ? `生成选中的镜头：${selectedShot.title}` : '请先点击一个 AI 片段'} onClick={() => void runShots([selectedShot!.id])}><WandSparkles size={13} />生成当前镜头</button>
-        <button type="button" disabled={!shots.length || anyGenerating || Boolean(queueProgress)} title="按时间顺序生成所有 AI 轨道中已备齐的片段，已生成的也会重新生成，取回视频后再生成下一段" onClick={() => void runShots()}>{queueProgress ? <LoaderCircle size={13} className="spin" /> : <Play size={13} />}{queueProgress ? '队列执行中' : '批量生成'}</button>
+        <button type="button" disabled={!(selectionMode ? checkedShots.length : shots.length) || anyGenerating || Boolean(queueProgress)} title={selectionMode ? '只生成打勾的 AI 片段，取回视频后再生成下一段' : '按时间顺序生成所有 AI 轨道中已备齐的片段，已生成的也会重新生成，取回视频后再生成下一段'} onClick={() => void runShots(selectionMode ? checkedShots.map(shot => shot.id) : undefined)}>{queueProgress ? <LoaderCircle size={13} className="spin" /> : <Play size={13} />}{queueProgress ? '队列执行中' : selectionMode ? `生成已选（${checkedShots.length}）` : '批量生成'}</button>
         <button type="button" disabled={!trackCount} onClick={() => { setGenerationPosition({ trackIndex: activeRow ?? 0, startTime: currentTime }); openDraft() }}><Sparkles size={13} />文生视频</button>
         <button type="button" onClick={addTrack}><Plus size={14} />添加 AI 轨道</button>
       </div>
@@ -271,7 +280,7 @@ export function AITracksPanel() {
               const generating = shot.generationStatus === 'queued' || shot.generationStatus === 'running'
               const status = waitingShotIds.includes(shot.id) ? '等待批量生成' : ({ idle: '待生成', queued: '排队中', running: slot?.stage ?? '生成中', succeeded: '已生成', failed: '生成失败' })[shot.generationStatus]
               return <div key={shot.id} data-ai-shot={shot.id} data-start-time={shot.startTime} data-duration={shot.duration}
-                className={`ai-track-existing-shot status-${shot.generationStatus} ${selectedShot?.id === shot.id ? 'selected' : ''} ${placement?.shotId === shot.id && placement.trackIndex !== index ? 'dragging-away' : ''}`} role="button" tabIndex={0} aria-pressed={selectedShot?.id === shot.id}
+                className={`ai-track-existing-shot status-${shot.generationStatus} ${selectionMode ? 'has-generation-checkbox' : ''} ${selectionMode && checkedShotIds.includes(shot.id) ? 'checked-for-generation' : ''} ${selectedShot?.id === shot.id ? 'selected' : ''} ${placement?.shotId === shot.id && placement.trackIndex !== index ? 'dragging-away' : ''}`} role="button" tabIndex={0} aria-pressed={selectedShot?.id === shot.id}
                 aria-label={`${shot.title} · ${shot.duration.toFixed(2)} 秒 · ${status}`} title={slot?.error || `${shot.title} · ${shot.duration.toFixed(2)} 秒 · ${status}；双击编辑参数，拖两端调整时长`}
                 style={{ left: shot.startTime * pixelsPerSecond - viewport.scrollLeft, width: Math.max(12, shot.duration * pixelsPerSecond) }}
                 onPointerDown={event => beginDrag(event, shot)}
@@ -282,6 +291,10 @@ export function AITracksPanel() {
                   if (event.key === ' ') { event.preventDefault(); event.stopPropagation(); selectShot(shot.id); setSelected(index) }
                 }}>
                 {generating && <span className="director-generation-progress" role="progressbar" aria-label={`${shot.title}采样进度`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={slot?.progress ?? 0} style={{ width: `${slot?.progress ?? 0}%` }} />}
+                {selectionMode && <input type="checkbox" className="ai-shot-generation-checkbox" checked={checkedShotIds.includes(shot.id)} disabled={anyGenerating || Boolean(queueProgress)}
+                  aria-label={`选择生成：${shot.title}，AI ${index + 1}，${shot.startTime.toFixed(2)} 秒开始`}
+                  onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}
+                  onChange={event => { const checked = event.currentTarget.checked; setCheckedShotIds(ids => checked ? [...ids, shot.id] : ids.filter(id => id !== shot.id)) }} />}
                 <span className="ai-shot-copy">{shot.title} · {shot.duration.toFixed(2)} 秒 <small>{status}{slot?.progress === undefined ? '' : ` · ${slot.progress}%`}</small></span>
                 {!generating && <><span className="ai-shot-resize left" data-resize="left" aria-label="调整 AI 片段起点" /><span className="ai-shot-resize right" data-resize="right" aria-label="调整 AI 片段终点" /></>}
               </div>
@@ -311,7 +324,7 @@ export function AITracksPanel() {
       {!trackCount && <div className="ai-tracks-empty">点击“添加 AI 轨道”创建轨道</div>}
       {trackCount > 0 && playheadOffset >= 0 && <div className="ai-tracks-playhead" aria-hidden="true" style={{ left: labelWidth + playheadOffset }} />}
     </div>
-    <footer className="ai-tracks-footer"><span role="status">{queueProgress ? queueProgress.shotIds.length ? `生成 ${queueProgress.index + 1}/${queueProgress.shotIds.length} · ${queueProgress.title} · 取回后继续下一段` : queueProgress.title : placement && (placement.trackIndex < 0 || placement.trackIndex === trackCount) ? '松开新建 AI 轨道' : selectedShot ? `已选择：${selectedShot.title}` : activeRow === null ? '选择一条 AI 轨道' : `已选择 AI ${activeRow + 1}`}</span><span>上下拖动换轨 · 双击编辑 · 拖两端调整时长</span></footer>
+    <footer className="ai-tracks-footer"><span role="status">{queueProgress ? queueProgress.shotIds.length ? `生成 ${queueProgress.index + 1}/${queueProgress.shotIds.length} · ${queueProgress.title} · 取回后继续下一段` : queueProgress.title : selectionMode ? `已勾选 ${checkedShots.length} 个镜头 · 点击“生成已选”只生成打勾片段` : placement && (placement.trackIndex < 0 || placement.trackIndex === trackCount) ? '松开新建 AI 轨道' : selectedShot ? `已选择：${selectedShot.title}` : activeRow === null ? '选择一条 AI 轨道' : `已选择 AI ${activeRow + 1}`}</span><span>上下拖动换轨 · 双击编辑 · 拖两端调整时长</span></footer>
     {generationMode === 'MotionTransfer' ? <MotionTransferDialog open={generationOpen} onOpenChange={setGenerationOpen}
       position={editingShot ? { startTime: editingShot.startTime, trackIndex: editingShot.trackIndex ?? 0 } : generationPosition}
       draftId={editingShotId} initialValues={editingScene && editingShot ? { ...editingScene.settings,

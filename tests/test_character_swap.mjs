@@ -25,7 +25,7 @@ async function adapter(api = {}) {
     const values = Object.fromEntries(module.namespace.fields.map(field => [field.name, field.default]));
     values.source_video = [file("original.mp4")];
     values.character_image = [file("person.png")];
-    return { ...module.namespace, provider: providers.get("CapCutMiniMaxH3CharacterSwapWorkflow"), values };
+    return { ...module.namespace, provider: providers.get("CapCutMiniMaxH3CharacterSwapWorkflow"), providers, values };
 }
 
 test("the fixed graph retains tracking, masked AV sampling and uncrop without sample files", async () => {
@@ -119,21 +119,27 @@ test("GPT enhancement feeds the replacement instructions while preserving the de
 });
 
 test("character swap reuses the installed prompt options and model endpoint", async () => {
-    const { provider } = await adapter({
-        getNodeDefs: async () => ({ MiniMaxH3PromptSkill: { input: { required: {
-            "官方 Skill": [["local-skill"], { default: "local-skill" }],
-            "导演": [["local-director"], { default: "local-director" }],
-        } } } }),
+    const paths = [];
+    const { provider, providers } = await adapter({
         fetchApi: async (path, options) => {
+            paths.push(path);
+            if (path === "/object_info/MiniMaxH3PromptSkill") return { ok: true, json: async () => ({ MiniMaxH3PromptSkill: { input: { required: {
+                "官方 Skill": [["local-skill"], { default: "local-skill" }],
+                "导演": [["local-director"], { default: "local-director" }],
+            } } } }) };
             assert.equal(path, "/minimax-prompt/models");
             assert.equal(JSON.parse(options.body).api_key, "test-key");
             return { ok: true, json: async () => ({ models: ["chosen-model"] }) };
         },
     });
-    const fields = await provider.getFields();
+    const [fields, videoFields] = await Promise.all([provider.getFields(), providers.get("CapCutMiniMaxH3Workflow").getFields()]);
     assert.equal(fields.find(field => field.name === "prompt_skill").default, "local-skill");
     assert.equal(fields.find(field => field.name === "prompt_director").options[0], "local-director");
     assert.ok(fields.some(field => field.name === "source_video"));
+    assert.ok(!videoFields.some(field => field.name === "source_video"));
+    assert.equal(videoFields.find(field => field.name === "prompt_director").options[0], "local-director");
+    await provider.getFields();
+    assert.deepEqual(paths, ["/object_info/MiniMaxH3PromptSkill"]);
     assert.equal((await provider.loadModels("test-key"))[0], "chosen-model");
 });
 

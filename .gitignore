@@ -23,6 +23,7 @@ coverage/
 /user/
 /models/
 /temp/
+/ComfyUI-CapCut/
 .playwright-cli/
 playwright-report/
 test-results/

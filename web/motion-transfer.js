@@ -1,6 +1,6 @@
 import { api } from "../../scripts/api.js";
 import { registerCapCutWorkflow } from "./editor.js";
-import { waitForVideo } from "./minimax.js";
+import { getWorkflowNodeInputs, waitForVideo } from "./minimax.js";
 
 export const fields = [
     { name: "source_video", label: "驱动视频（必选，可使用人体白模结果）", type: "media", kind: "video", default: "" },
@@ -140,8 +140,8 @@ registerCapCutWorkflow("CapCutMotionTransferWorkflow", {
     label: "MiniMax H3 动作迁移",
     fields,
     async getFields() {
-        const definitions = await api.getNodeDefs();
-        const options = definitions.ChatGPTImagePromptReverseGW?.input?.required?.model?.[0];
+        const inputs = await getWorkflowNodeInputs("ChatGPTImagePromptReverseGW");
+        const options = inputs?.required?.model?.[0];
         return fields.map(field => field.name === "prompt_model" && Array.isArray(options) && options.length
             ? { ...field, options, default: options.includes(field.default) ? field.default : options[0] } : field);
     },

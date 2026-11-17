@@ -346,14 +346,36 @@ test("generation duration accepts 4 and 15 seconds and rejects values outside th
 });
 
 test("director selectors use the installed prompt node schema", async () => {
-    const { provider } = await adapter({ getNodeDefs: async () => ({ MiniMaxH3PromptSkill: { input: {
-        required: { "官方 Skill": [["new-local-skill"], { default: "new-local-skill" }], "模型": [[""], {}] },
-        optional: { "导演": [["new-director"], { default: "new-director" }] }
-    } } }) });
+    const { provider } = await adapter({ fetchApi: async path => {
+        assert.equal(path, "/object_info/MiniMaxH3PromptSkill");
+        return { ok: true, json: async () => ({ MiniMaxH3PromptSkill: { input: {
+            required: { "官方 Skill": [["new-local-skill"], { default: "new-local-skill" }], "模型": [[""], {}] },
+            optional: { "导演": [["new-director"], { default: "new-director" }] }
+        } } }) };
+    } });
     const fields = await provider.getFields();
     assert.equal(fields.find(field => field.name === "prompt_skill").default, "new-local-skill");
     assert.equal(fields.find(field => field.name === "prompt_director").options[0], "new-director");
     assert.equal(fields.find(field => field.name === "prompt_model").options[0], "gpt-6-sol");
+});
+
+test("failed option requests can be retried when reopening the dialog", async () => {
+    let calls = 0;
+    const { provider } = await adapter({ fetchApi: async () => {
+        calls++;
+        return calls === 1 ? { ok: false, status: 503 } : { ok: true, json: async () => ({ MiniMaxH3PromptSkill: { input: {
+            required: { "导演": [["recovered-director"], {}] }
+        } } }) };
+    } });
+    await assert.rejects(provider.getFields(), /503/);
+    const fields = await provider.getFields();
+    assert.equal(fields.find(field => field.name === "prompt_director").options[0], "recovered-director");
+    assert.equal(calls, 2);
+});
+
+test("missing optional prompt nodes keep the built-in choices", async () => {
+    const { provider, fields } = await adapter({ fetchApi: async () => ({ ok: true, json: async () => ({}) }) });
+    assert.deepEqual(await provider.getFields(), fields);
 });
 
 test("model choices reuse the original prompt plugin endpoint", async () => {

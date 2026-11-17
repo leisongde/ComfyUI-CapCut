@@ -28,6 +28,22 @@ async function adapter(api = {}, random = Math.random) {
     return { ...module.namespace, provider: providers.get("CapCutMotionTransferWorkflow"), values };
 }
 
+test("motion model choices load only their node schema and reuse it on reopen", async () => {
+    const paths = [];
+    const { provider } = await adapter({ fetchApi: async path => {
+        paths.push(path);
+        assert.equal(path, "/object_info/ChatGPTImagePromptReverseGW");
+        return { ok: true, json: async () => ({ ChatGPTImagePromptReverseGW: { input: {
+            required: { model: [["installed-model"], {}] }
+        } } }) };
+    } });
+    const [fields, reopened] = await Promise.all([provider.getFields(), provider.getFields()]);
+    assert.equal(fields.find(field => field.name === "prompt_model").default, "installed-model");
+    assert.equal(reopened.find(field => field.name === "prompt_model").options[0], "installed-model");
+    await provider.getFields();
+    assert.deepEqual(paths, ["/object_info/ChatGPTImagePromptReverseGW"]);
+});
+
 test("motion transfer preserves the original LoRA order, sparse attention, AV sampling and 17k+5 frame alignment", async () => {
     const { buildMotionTransferPrompt, values } = await adapter();
     const prompt = buildMotionTransferPrompt(template, {}, values);

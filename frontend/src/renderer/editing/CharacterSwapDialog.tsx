@@ -96,12 +96,12 @@ export function CharacterSwapDialog({ open, onOpenChange, position, draftId, ini
     keyWrites.current = write
     return write
   }
-  const refreshModels = async () => {
+  const refreshModels = async (automatic = false) => {
     const key = String(values.prompt_api_key ?? '').trim()
     if (!key || !module) return
     const current = ++modelRequest.current
     setLoadingModels(true)
-    setError('')
+    if (!automatic) setError('')
     try {
       const options = await request<string[]>('capcut:workflow-models' as never, { id: module.id, key })
       if (current !== modelRequest.current) return
@@ -110,6 +110,9 @@ export function CharacterSwapDialog({ open, onOpenChange, position, draftId, ini
     } catch (error) { if (current === modelRequest.current) setError((error as Error).message) }
     finally { if (current === modelRequest.current) setLoadingModels(false) }
   }
+  useEffect(() => {
+    if (open && !loading && module && enhancementEnabled) void refreshModels(true)
+  }, [loading, module, enhancementEnabled])
   const complete = async (generate = false) => {
     if (disabled || !module) return
     if (!form.current?.reportValidity()) return
@@ -154,7 +157,11 @@ export function CharacterSwapDialog({ open, onOpenChange, position, draftId, ini
         <label>被替换人物的特征描述<textarea aria-label="被替换人物的特征描述" rows={2} value={String(values.subject_prompt ?? '')} onChange={event => update('subject_prompt', event.target.value)} /><small>描述原视频中的人物，例如 girl in pink dress（穿粉色裙子的女孩），建议英文。</small></label>
         <PromptEditor value={String(values.prompt ?? '')} references={references} disabled={disabled} onChange={value => update('prompt', value)} />
         <div className="text-to-video-key"><small>沿用原工作流的替换模板，可直接修改。</small><button type="button" onClick={() => update('prompt', module?.fields.find(field => field.name === 'prompt')?.default ?? '')}>恢复工作流模板</button></div>
-        <label>GPT 优化提示词<select aria-label="GPT 优化提示词" value={String(values.enhance_prompt ?? 'off')} onChange={event => update('enhance_prompt', event.target.value)}>
+        <label>GPT 优化提示词<select aria-label="GPT 优化提示词" value={String(values.enhance_prompt ?? 'off')} onChange={event => {
+          modelRequest.current++
+          setLoadingModels(false)
+          update('enhance_prompt', event.target.value)
+        }}>
           <option value="off">关闭，直接使用提示词</option><option value="on">开启，生成前使用 GPT 优化</option>
         </select></label>
         {enhancementEnabled && <>
