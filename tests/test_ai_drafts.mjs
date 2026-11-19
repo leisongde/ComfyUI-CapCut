@@ -18,6 +18,7 @@ async function setup(draftValues = values, options = {}) {
     const result = new Promise((resolve, reject) => { finish = resolve; fail = reject; });
     const calls = [], assets = [];
     const context = vm.createContext({ crypto: options.crypto ?? globalThis.crypto, File, Uint8Array, CustomEvent,
+        Math: options.random ? Object.assign(Object.create(Math), { random: options.random }) : Math,
         window: { dispatchEvent() {} }, console });
     const mocks = {
         [new URL('bridge.ts', editing).href]: { request: async (operation, payload, transfer, timeout, progress) => {
@@ -746,12 +747,12 @@ test('motion transfer keeps supplied durations outside the H3 dialog range throu
     }
 });
 
-test('motion transfer uses its supplied key for automatic prompts and keeps random seeds and sound choice', async () => {
+test('motion transfer uses its supplied key for automatic prompts and keeps the fixed seed and sound choice', async () => {
     for (const audio_mode of ['source', 'mute']) for (const key of ['', '  motion-test-key  ']) {
         const motionValues = { task_type: 'MotionTransfer', duration: 6.3, source_video: 'driver',
             character_images: ['red', 'yellow'], character_slots: [1, 5], megapixels: 0.8, aspect_ratio: '16:9 (Widescreen)',
-            seed: 123, enhance_prompt: 'off', prompt_api_key: key, prompt_model: 'chosen-model', prompt: 'unused prompt', audio_mode };
-        const env = await setup(motionValues);
+            seed_mode: 'fixed', seed: '375540071883589', enhance_prompt: 'off', prompt_api_key: key, prompt_model: 'chosen-model', prompt: 'unused prompt', audio_mode };
+        const env = await setup(motionValues, { random: () => assert.fail('a fixed seed must not draw a random number') });
         const task = env.api.generateTextToVideo(env.editor, env.shotId, 'motion-module', motionValues);
         const slot = env.editor.timeline.getTracks().flatMap(track => track.elements)[0];
         assert.equal(slot.name, '动作迁移');
@@ -766,7 +767,8 @@ test('motion transfer uses its supplied key for automatic prompts and keeps rand
         assert.equal(submitted.duration, 6.3);
         assert.equal(submitted.megapixels, 0.8);
         assert.equal(submitted.aspect_ratio, motionValues.aspect_ratio);
-        assert.equal(submitted.seed, -1);
+        assert.equal(submitted.seed, 375540071883589);
+        assert.ok(!Object.hasOwn(submitted, 'seed_mode'));
         assert.equal(submitted.prompt, '');
         assert.equal(submitted.enhance_prompt, key.trim() ? 'on' : 'off');
         assert.equal(submitted.prompt_api_key, key.trim());
@@ -789,7 +791,7 @@ test('motion transfer uses its supplied key for automatic prompts and keeps rand
 test('saved motion shots use their separate local key for single and batch generation without putting it in the project', async () => {
     for (const key of ['', 'saved-motion-key']) for (const single of [true, false]) {
         const draft = { task_type: 'MotionTransfer', duration: 5, source_video: 'driver', character_images: ['person'], character_slots: [1],
-            prompt_api_key: 'discard-this-key', enhance_prompt: 'off' };
+            prompt_api_key: 'discard-this-key', enhance_prompt: 'off', selflift_enabled: true, refine_enabled: true, refine_megapixels: '1.2' };
         const env = await setup(draft, { key: 'other-provider-key', motionKey: key,
             modules: [{ id: 'motion', nodeType: 'CapCutMotionTransferWorkflow', fields: [{ name: 'prompt_model', default: 'chosen-model' }] }],
             media: [{ id: 'driver', type: 'video' }, { id: 'person', type: 'image' }],
@@ -800,6 +802,9 @@ test('saved motion shots use their separate local key for single and batch gener
         assert.equal(submitted.values.enhance_prompt, key ? 'on' : 'off');
         assert.equal(submitted.values.prompt_api_key, key);
         assert.equal(submitted.values.prompt_model, 'chosen-model');
+        assert.equal(submitted.values.selflift_enabled, true);
+        assert.equal(submitted.values.refine_enabled, true);
+        assert.equal(submitted.values.refine_megapixels, '1.2');
         assert.ok(env.calls.some(call => call.operation === 'capcut:motion-transfer-key:get'));
         for (const secret of ['saved-motion-key', 'other-provider-key', 'discard-this-key'])
             assert.ok(!JSON.stringify(env.planning()).includes(secret));
@@ -834,10 +839,13 @@ const deferred = () => {
 test('batch generation waits for video retrieval, asset storage, timeline replacement and save before submitting the next shot', async () => {
     const importing = deferred(), imported = deferred(), storing = deferred(), stored = deferred(), saving = deferred(), saved = deferred();
     let env, firstId, firstSaved = false;
-    const submissions = [];
-    env = await setup({ ...values, task_type: 'T2VA', prompt: 'later shot' }, {
+    const submissions = [], draws = [0, 0.999999999];
+    const randomValues = { ...values, task_type: 'T2VA', seed_mode: 'random', seed: '71' };
+    env = await setup({ ...randomValues, prompt: 'later shot' }, {
+        random: () => draws.shift(),
         onRun: async payload => {
-            submissions.push(payload.values.prompt);
+            submissions.push([payload.values.prompt, payload.values.seed]);
+            assert.ok(!Object.hasOwn(payload.values, 'seed_mode'));
             if (submissions.length === 2) assert.equal(env.planning().scenes.flatMap(scene => scene.shots).find(shot => shot.id === firstId).generationStatus, 'succeeded');
             return [{ filename: 'result.mp4' }];
         },
@@ -849,13 +857,15 @@ test('batch generation waits for video retrieval, asset storage, timeline replac
             }
         },
     });
-    const withFirst = env.api.saveTextToVideoDraft(env.planning(), { startTime: 0, trackIndex: 0 }, { ...values, task_type: 'T2VA', prompt: 'first shot' });
+    const withFirst = env.api.saveTextToVideoDraft(env.planning(), { startTime: 0, trackIndex: 0 }, { ...randomValues, prompt: 'first shot' });
+    assert.equal(draws.length, 2);
     firstId = withFirst.selectedShotId;
     env.setPlanning(withFirst);
     const progress = [];
     const task = env.api.generateAIShots(env.editor, undefined, value => progress.push(value));
     await importing.promise;
-    assert.deepEqual(submissions, ['first shot']);
+    assert.deepEqual(submissions, [['first shot', 0]]);
+    assert.equal(draws.length, 1);
     assert.equal(env.assets.length, 0);
     await assert.rejects(env.api.generateAIShots(env.editor), /已有镜头正在生成/);
     await assert.rejects(env.api.generateTextToVideo(env.editor, env.shotId, 'module', values), /生成队列执行中/);
@@ -870,7 +880,11 @@ test('batch generation waits for video retrieval, asset storage, timeline replac
     saved.resolve();
     const result = await task;
     assert.equal(result.completed, 2);
-    assert.deepEqual(submissions, ['first shot', 'later shot']);
+    assert.deepEqual(submissions, [['first shot', 0], ['later shot', 99_999_999]]);
+    for (const scene of env.planning().scenes) {
+        assert.equal(scene.settings.seed_mode, 'random');
+        assert.equal(scene.settings.seed, '71');
+    }
     assert.deepEqual(progress.map(item => item.index), [0, 1]);
     assert.equal(progress[0].shotIds[0], firstId);
     assert.equal(env.assets.length, 2);

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
-import { Activity, Box, Clapperboard, Images, ImagePlus, ListChecks, LoaderCircle, Play, Plus, Sparkles, Trash2, UserRound, Video, WandSparkles } from 'lucide-react'
+import { Activity, Box, Clapperboard, Maximize2, Images, ImagePlus, ListChecks, LoaderCircle, Play, Plus, Sparkles, Trash2, UserRound, Video, WandSparkles } from 'lucide-react'
 import { useEditor } from '@/hooks/use-editor'
 import type { EditorCore } from '@/core'
 import { Command } from '@/lib/commands/base-command'
@@ -92,12 +92,13 @@ export function AITracksPanel() {
       const scene = getDirectorPlanning(editor.project.getActive())?.scenes.find(scene => scene.id === sceneId)
       const characterSwap = scene?.settings.task_type === 'CharacterSwap'
       const bodyRender = scene?.settings.task_type === 'BodyRender'
+      const relayVSR = scene?.settings.task_type === 'RelayVSR'
       const motionTransfer = scene?.settings.task_type === 'MotionTransfer'
-      const shot = scene?.shots.find(shot => shot.taskType === 'i2v' || shot.taskType === 'fl2v' || shot.taskType === 'v2v' || (shot.taskType === 'r2v' && (characterSwap || bodyRender || motionTransfer)))
+      const shot = scene?.shots.find(shot => shot.taskType === 'i2v' || shot.taskType === 'fl2v' || shot.taskType === 'v2v' || (shot.taskType === 'r2v' && (characterSwap || bodyRender || motionTransfer || relayVSR)))
       if (!shot) return
       setEditingShotId(shot.id)
       const referenceEdit = scene?.settings.task_type === 'V2VARef'
-      setGenerationMode(motionTransfer ? 'MotionTransfer' : bodyRender ? 'BodyRender' : characterSwap ? 'CharacterSwap' : shot.taskType === 'v2v' ? referenceEdit ? 'V2VARef' : 'V2VA' : shot.taskType === 'fl2v' ? 'FL2VA' : 'I2VA')
+      setGenerationMode(relayVSR ? 'RelayVSR' : motionTransfer ? 'MotionTransfer' : bodyRender ? 'BodyRender' : characterSwap ? 'CharacterSwap' : shot.taskType === 'v2v' ? referenceEdit ? 'V2VARef' : 'V2VA' : shot.taskType === 'fl2v' ? 'FL2VA' : 'I2VA')
       setGenerationPosition({ trackIndex: shot.trackIndex ?? 0, startTime: shot.startTime })
       setSelected(shot.trackIndex ?? 0)
       setGenerationOpen(true)
@@ -163,8 +164,9 @@ export function AITracksPanel() {
     const referenceEdit = shot && planning?.scenes.find(scene => scene.id === shot.sceneId)?.settings.task_type === 'V2VARef'
     const characterSwap = shot && planning?.scenes.find(scene => scene.id === shot.sceneId)?.settings.task_type === 'CharacterSwap'
     const bodyRender = shot && planning?.scenes.find(scene => scene.id === shot.sceneId)?.settings.task_type === 'BodyRender'
+    const relayVSR = shot && planning?.scenes.find(scene => scene.id === shot.sceneId)?.settings.task_type === 'RelayVSR'
     const motionTransfer = shot && planning?.scenes.find(scene => scene.id === shot.sceneId)?.settings.task_type === 'MotionTransfer'
-    setGenerationMode(shot ? motionTransfer ? 'MotionTransfer' : bodyRender ? 'BodyRender' : characterSwap ? 'CharacterSwap' : shot.taskType === 'v2v' ? referenceEdit ? 'V2VARef' : 'V2VA' : shot.taskType === 'r2v' ? 'Ref2VA' : shot.taskType === 'fl2v' ? 'FL2VA' : shot.taskType === 'i2v' ? 'I2VA' : 'T2VA' : mode)
+    setGenerationMode(shot ? relayVSR ? 'RelayVSR' : motionTransfer ? 'MotionTransfer' : bodyRender ? 'BodyRender' : characterSwap ? 'CharacterSwap' : shot.taskType === 'v2v' ? referenceEdit ? 'V2VARef' : 'V2VA' : shot.taskType === 'r2v' ? 'Ref2VA' : shot.taskType === 'fl2v' ? 'FL2VA' : shot.taskType === 'i2v' ? 'I2VA' : 'T2VA' : mode)
     if (shot) setGenerationPosition({ trackIndex: shot.trackIndex ?? 0, startTime: shot.startTime })
     setGenerationOpen(true)
   }
@@ -276,12 +278,13 @@ export function AITracksPanel() {
             onWheel={event => { if (event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) requestTimelineScroll(viewport.scrollLeft + (event.deltaX || event.deltaY)) }}>
             {!rowShots.length && <span className="ai-track-empty"><Plus size={15} />空白 AI 轨道</span>}
             {rowShots.map(shot => {
+              const relayVSR = planning?.scenes.find(scene => scene.id === shot.sceneId)?.settings.task_type === 'RelayVSR'
               const slot = getTextToVideoSlot(editor, shot.id)
               const generating = shot.generationStatus === 'queued' || shot.generationStatus === 'running'
               const status = waitingShotIds.includes(shot.id) ? '等待批量生成' : ({ idle: '待生成', queued: '排队中', running: slot?.stage ?? '生成中', succeeded: '已生成', failed: '生成失败' })[shot.generationStatus]
               return <div key={shot.id} data-ai-shot={shot.id} data-start-time={shot.startTime} data-duration={shot.duration}
                 className={`ai-track-existing-shot status-${shot.generationStatus} ${selectionMode ? 'has-generation-checkbox' : ''} ${selectionMode && checkedShotIds.includes(shot.id) ? 'checked-for-generation' : ''} ${selectedShot?.id === shot.id ? 'selected' : ''} ${placement?.shotId === shot.id && placement.trackIndex !== index ? 'dragging-away' : ''}`} role="button" tabIndex={0} aria-pressed={selectedShot?.id === shot.id}
-                aria-label={`${shot.title} · ${shot.duration.toFixed(2)} 秒 · ${status}`} title={slot?.error || `${shot.title} · ${shot.duration.toFixed(2)} 秒 · ${status}；双击编辑参数，拖两端调整时长`}
+                aria-label={`${shot.title} · ${shot.duration.toFixed(2)} 秒 · ${status}`} title={slot?.error || `${shot.title} · ${shot.duration.toFixed(2)} 秒 · ${status}；双击编辑参数${relayVSR ? '' : '，拖两端调整时长'}`}
                 style={{ left: shot.startTime * pixelsPerSecond - viewport.scrollLeft, width: Math.max(12, shot.duration * pixelsPerSecond) }}
                 onPointerDown={event => beginDrag(event, shot)}
                 onClick={event => { event.stopPropagation(); selectShot(shot.id); setSelected(index) }}
@@ -296,7 +299,7 @@ export function AITracksPanel() {
                   onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}
                   onChange={event => { const checked = event.currentTarget.checked; setCheckedShotIds(ids => checked ? [...ids, shot.id] : ids.filter(id => id !== shot.id)) }} />}
                 <span className="ai-shot-copy">{shot.title} · {shot.duration.toFixed(2)} 秒 <small>{status}{slot?.progress === undefined ? '' : ` · ${slot.progress}%`}</small></span>
-                {!generating && <><span className="ai-shot-resize left" data-resize="left" aria-label="调整 AI 片段起点" /><span className="ai-shot-resize right" data-resize="right" aria-label="调整 AI 片段终点" /></>}
+                {!generating && !relayVSR && <><span className="ai-shot-resize left" data-resize="left" aria-label="调整 AI 片段起点" /><span className="ai-shot-resize right" data-resize="right" aria-label="调整 AI 片段终点" /></>}
               </div>
             })}
             {placement?.trackIndex === index && movingShot && (movingShot.trackIndex ?? 0) !== index && <div className="ai-track-existing-shot ai-shot-drop-preview" aria-hidden="true"
@@ -313,6 +316,7 @@ export function AITracksPanel() {
             {!contextShotId && <ContextMenuItem onSelect={() => openDraft(undefined, 'CharacterSwap')}><UserRound size={14} />人物替换</ContextMenuItem>}
             {!contextShotId && <ContextMenuItem onSelect={() => openDraft(undefined, 'BodyRender')}><Box size={14} />视频转白模</ContextMenuItem>}
             {!contextShotId && <ContextMenuItem onSelect={() => openDraft(undefined, 'MotionTransfer')}><Activity size={14} />动作迁移</ContextMenuItem>}
+            {!contextShotId && <ContextMenuItem onSelect={() => openDraft(undefined, 'RelayVSR')}><Maximize2 size={14} />Relay VSR 视频放大</ContextMenuItem>}
             {contextShotId && <ContextMenuItem disabled={waitingShotIds.includes(contextShotId) || shots.some(shot => shot.id === contextShotId && ['queued', 'running'].includes(shot.generationStatus))} onSelect={() => {
               const before = getDirectorPlanning(editor.project.getActive())
               if (before) change(removeDirectorShot(before, contextShotId))
@@ -331,7 +335,7 @@ export function AITracksPanel() {
         source_video: editingShot.refVideos[0]?.assetId ?? '', character_images: editingShot.refs.map(ref => ref.assetId),
         character_slots: editingShot.refs.map(ref => ref.index), duration: editingShot.duration } : undefined}
       busy={busy} generationError={editingSlot?.error} onSave={saveDraft} onGenerate={generate} />
-    : generationMode === 'BodyRender' ? <BodyRenderDialog open={generationOpen} onOpenChange={setGenerationOpen}
+    : (generationMode === 'BodyRender' || generationMode === 'RelayVSR') ? <BodyRenderDialog mode={generationMode} open={generationOpen} onOpenChange={setGenerationOpen}
       position={editingShot ? { startTime: editingShot.startTime, trackIndex: editingShot.trackIndex ?? 0 } : generationPosition}
       draftId={editingShotId} initialValues={editingScene && editingShot ? { ...editingScene.settings,
         source_video: editingShot.refVideos[0]?.assetId ?? '', duration: editingShot.duration } : undefined}

@@ -25,7 +25,8 @@ export interface DirectorVideoSourceRange {
 
 /** trimStart is in source seconds; startTime only locates the clip on the editing timeline. */
 export function getDirectorVideoSourceRange(
-  element: Pick<VideoElement, 'trimStart' | 'duration' | 'playbackRate' | 'reversed'>
+  element: Pick<VideoElement, 'trimStart' | 'duration' | 'playbackRate' | 'reversed'>,
+  maxDuration = 15
 ): DirectorVideoSourceRange {
   const duration = Number(element.duration)
   const start = Number(element.trimStart ?? 0)
@@ -33,7 +34,7 @@ export function getDirectorVideoSourceRange(
   if (
     !Number.isFinite(duration) ||
     duration <= 0 ||
-    duration > 15 ||
+    duration > maxDuration ||
     !Number.isFinite(start) ||
     start < 0 ||
     !Number.isFinite(playbackRate) ||
@@ -100,9 +101,10 @@ async function extractAudio(
 export async function extractDirectorVideoSource(
   element: VideoElement,
   media: MediaAsset,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  options?: { maxDuration?: number; useSourceFrameRate?: boolean }
 ): Promise<Omit<MediaAsset, 'id'>> {
-  const range = getDirectorVideoSourceRange(element)
+  const range = getDirectorVideoSourceRange(element, options?.maxDuration)
   const input = new Input({ source: new BlobSource(media.file), formats: ALL_FORMATS })
   let output: Output<Mp4OutputFormat, BufferTarget> | undefined
   try {
@@ -118,7 +120,11 @@ export async function extractDirectorVideoSource(
     const context = canvas.getContext('2d', { alpha: false, willReadFrequently: true })
     if (!context) throw new Error('无法创建视频片段预览')
     const audio = await extractAudio(input, range)
-    const fps = 24
+    let fps = 24
+    if (options?.useSourceFrameRate) {
+      const sourceFps = media.fps || (await track.computePacketStats(100)).averagePacketRate
+      if (Number.isFinite(sourceFps) && sourceFps > 0) fps = sourceFps
+    }
     const frameCount = Math.ceil(range.duration * fps)
     output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() })
     const videoSource = new CanvasSource(canvas, { codec: 'avc', bitrate: QUALITY_HIGH, hardwareAcceleration: 'prefer-software' })

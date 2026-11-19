@@ -1,8 +1,9 @@
 import { api } from "../../scripts/api.js";
 import { registerCapCutWorkflow } from "./editor.js";
-import { getWorkflowNodeInputs, waitForVideo } from "./minimax.js";
+import { getWorkflowNodeInputs, waitForVideo, samplingFields, applySamplingOptions, samplingPercent, fixedSeed } from "./minimax.js";
 
 export const fields = [
+    ...samplingFields,
     { name: "source_video", label: "驱动视频（必选，可使用人体白模结果）", type: "media", kind: "video", default: "" },
     { name: "character_images", label: "角色参考图（按顺序对应蓝、红、绿、品红、青、黄）", type: "media", kind: "image", multiple: true, default: [] },
     { name: "prompt", label: "补充要求（可留空）", type: "textarea", default: "" },
@@ -19,7 +20,7 @@ export const fields = [
     ] },
     { name: "megapixels", label: "输出分辨率（百万像素）", type: "number", default: 0.4, step: 0.1 },
     { name: "longest_side", label: "驱动视频处理长边（像素，保持原比例）", type: "number", default: 736, min: 32, step: 32 },
-    { name: "seed", label: "种子（-1 为随机）", type: "number", default: -1 },
+    { name: "seed", label: "固定种子", type: "number", default: 0, min: 0, step: 1 },
     { name: "audio_mode", label: "声音处理", type: "select", default: "source", options: [
         { value: "source", label: "保留驱动视频原声（需含音轨）" }, { value: "mute", label: "静音（无音轨视频请选择此项）" },
     ] },
@@ -88,7 +89,8 @@ export function buildMotionTransferPrompt(template, configuration, values) {
     prompt["39"].inputs.aspect_ratio = values.aspect_ratio;
     prompt["39"].inputs.megapixels = megapixels;
     prompt["32"].inputs.scale_to_length = size;
-    prompt["314"].inputs.noise_seed = Number(values.seed) === -1 ? Math.floor(Math.random() * Number.MAX_SAFE_INTEGER) : Number(values.seed);
+    const sampler = prompt["314"].inputs;
+    sampler.noise_seed = fixedSeed(values.seed, sampler.noise_seed);
     if (configuration.sparse_attention === false) {
         prompt["27"].inputs.model = ["13", 0];
         prompt["314"].inputs.model = ["13", 0];
@@ -145,16 +147,21 @@ registerCapCutWorkflow("CapCutMotionTransferWorkflow", {
         return fields.map(field => field.name === "prompt_model" && Array.isArray(options) && options.length
             ? { ...field, options, default: options.includes(field.default) ? field.default : options[0] } : field);
     },
-    async run({ node, values, onProgress }) {
+    async run({ node, values, onProgress, getConsolePrompt }) {
         const response = await fetch(new URL("./workflows/motion_transfer.json", import.meta.url));
         if (!response.ok) throw new Error("无法读取内置动作迁移工作流，请刷新页面后重试");
         const configuration = Object.fromEntries(node.widgets.map(widget => [widget.name, widget.value]));
         const output = buildMotionTransferPrompt(await response.json(), configuration, values);
+        await applySamplingOptions(output, values, getConsolePrompt, "314", {
+            latent: output["314"].inputs.latent_image, positive: ["12", 0], model: ["11", 0], video_vae: ["2", 0], sigmas: ["27", 0],
+            seed: output["314"].inputs.noise_seed, shift_video: output["7"].inputs.shift_video, shift_audio: output["7"].inputs.shift_audio,
+        });
+        if (values.selflift_enabled === true) for (const id of ["21", "26"]) delete output[id];
         const definitions = await api.getNodeDefs();
         const missing = [...new Set(Object.values(output).map(item => item.class_type))].filter(type => !definitions[type]);
         if (missing.length) throw new Error(`缺少动作迁移节点：${missing.join("、")}。请安装原工作流依赖并重启 ComfyUI`);
         let promptId;
-        const stages = { "117": "读取驱动视频", "5": "加载视频模型", "6": "加载动作修复 LoRA", "376": "GPT 编排动作迁移提示词", "12": "准备角色与动作条件", "314": "动作迁移采样", "36": "视频解码", "382": "清理显存", "346": "保存视频" };
+        const stages = { "117": "读取驱动视频", "5": "加载视频模型", "6": "加载动作修复 LoRA", "376": "GPT 编排动作迁移提示词", "12": "准备角色与动作条件", "314": values.selflift_enabled === true ? "SelfLift 渐进采样" : "动作迁移采样", capcut_refine: "放大与二采", "36": "视频解码", "382": "清理显存", "346": "保存视频" };
         const executing = event => {
             if (!promptId || event.detail.prompt_id !== promptId) return;
             const id = String(event.detail.node);
@@ -163,8 +170,8 @@ registerCapCutWorkflow("CapCutMotionTransferWorkflow", {
         };
         const progress = event => {
             const data = event.detail;
-            if (!promptId || data.prompt_id !== promptId || String(data.node) !== "314" || !(data.max > 0)) return;
-            onProgress({ status: "running", percent: Math.round(data.value / data.max * 100), stage: `动作迁移 ${data.value}/${data.max} 步` });
+            if (!promptId || data.prompt_id !== promptId || !["314", "capcut_refine"].includes(String(data.node)) || !(data.max > 0)) return;
+            onProgress({ status: "running", percent: samplingPercent(data, values), stage: `${stages[String(data.node)]} ${data.value}/${data.max} 步` });
         };
         if (onProgress) {
             api.addEventListener("executing", executing);

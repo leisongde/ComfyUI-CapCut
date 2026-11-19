@@ -12,7 +12,7 @@ import { createDirectorSceneAt, findDirectorScene, findDirectorShot, getDirector
 import { createDirectorGenerationPlan, fillDirectorGenerationPlaceholder, getDirectorGenerationPlaceholders, reserveDirectorGenerationPlaceholders, updateDirectorGenerationPlaceholders } from './director-generation-placeholders'
 
 export type GenerationPosition = { trackIndex: number; startTime: number }
-export type GenerationMode = 'T2VA' | 'I2VA' | 'FL2VA' | 'Ref2VA' | 'V2VA' | 'V2VARef' | 'CharacterSwap' | 'BodyRender' | 'MotionTransfer'
+export type GenerationMode = 'T2VA' | 'I2VA' | 'FL2VA' | 'Ref2VA' | 'V2VA' | 'V2VARef' | 'CharacterSwap' | 'BodyRender' | 'MotionTransfer' | 'RelayVSR'
 const activeRequests = new Set<string>()
 let shotQueueActive = false
 
@@ -25,7 +25,7 @@ function savedShotRequest(editor: EditorCore, shotId: string, modules: Generatio
   const scene = planning && findDirectorScene(planning, shotId)
   if (!shot || !scene) throw new Error('AI 片段已移除')
   const mode = String(scene.settings.task_type ?? { t2v: 'T2VA', i2v: 'I2VA', fl2v: 'FL2VA', r2v: 'Ref2VA', v2v: 'V2VA' }[shot.taskType])
-  const nodeType = { CharacterSwap: 'CapCutMiniMaxH3CharacterSwapWorkflow', BodyRender: 'CapCutBodyRenderWorkflow', MotionTransfer: 'CapCutMotionTransferWorkflow' }[mode] ?? 'CapCutMiniMaxH3Workflow'
+  const nodeType = { CharacterSwap: 'CapCutMiniMaxH3CharacterSwapWorkflow', BodyRender: 'CapCutBodyRenderWorkflow', MotionTransfer: 'CapCutMotionTransferWorkflow', RelayVSR: 'CapCutRelayVSRWorkflow' }[mode] ?? 'CapCutMiniMaxH3Workflow'
   const module = modules.find(item => item.nodeType === nodeType)
   if (!module) throw new Error(`请先连接${shot.title}使用的工作流模块`)
   const values: Record<string, unknown> = { ...Object.fromEntries(module.fields.map(field => [field.name, field.default])),
@@ -35,14 +35,14 @@ function savedShotRequest(editor: EditorCore, shotId: string, modules: Generatio
     ref_images: shot.refs.map(ref => ref.assetId), ref_videos: shot.refVideos.map(ref => ref.assetId), ref_audios: shot.refAudios.map(ref => ref.assetId),
     source_video: shot.refVideos[0]?.assetId ?? '', character_image: shot.refs[0]?.assetId ?? '',
     character_images: shot.refs.map(ref => ref.assetId), character_slots: shot.refs.map((ref, index) => ref.index ?? index) }
-  if (mode !== 'BodyRender' && mode !== 'MotionTransfer') {
+  if (mode !== 'BodyRender' && mode !== 'MotionTransfer' && mode !== 'RelayVSR') {
     if (!shot.prompt.trim()) throw new Error('请填写提示词')
     if (values.enhance_prompt === 'on') {
       if (!key.trim()) throw new Error('请先在参数面板保存 API Key')
     }
   }
   if (mode === 'CharacterSwap' && !String(values.subject_prompt ?? '').trim()) throw new Error('请描述原视频中需要被替换的人物')
-  const mediaFields = module.fields.filter(field => field.type === 'media' && (mode === 'CharacterSwap' || mode === 'BodyRender' || mode === 'MotionTransfer'
+  const mediaFields = module.fields.filter(field => field.type === 'media' && (mode === 'CharacterSwap' || mode === 'BodyRender' || mode === 'MotionTransfer' || mode === 'RelayVSR'
     || (mode === 'I2VA' && field.name === 'first_frame') || (mode === 'FL2VA' && ['first_frame', 'last_frame'].includes(field.name))
     || (mode === 'Ref2VA' && ['ref_images', 'ref_videos', 'ref_audios'].includes(field.name))
     || (mode === 'V2VA' && field.name === 'ref_videos') || (mode === 'V2VARef' && ['ref_images', 'ref_videos', 'ref_audios'].includes(field.name))))
@@ -111,10 +111,11 @@ function validateGenerationInputs(taskType: string, mode: string, values: Record
   if ((taskType === 'i2v' || firstLastFrames) && !values.first_frame) throw new Error('请上传首帧图片')
   if (firstLastFrames && !values.last_frame) throw new Error('请上传尾帧图片')
   if (taskType === 'v2v' && (!Array.isArray(values.ref_videos) || !values.ref_videos[0])) throw new Error('请上传视频 1')
-  if ((characterSwap || bodyRender || motionTransfer) && !values.source_video) throw new Error('请上传原视频')
+  const relayVSR = mode === 'RelayVSR'
+  if ((characterSwap || bodyRender || motionTransfer || relayVSR) && !values.source_video) throw new Error('请上传原视频')
   if (characterSwap && !values.character_image) throw new Error('请上传替换人物图片')
   if (motionTransfer && (!Array.isArray(values.character_images) || !values.character_images.length)) throw new Error('请至少上传一张角色参考图')
-  if (taskType === 'r2v' && !characterSwap && !bodyRender && !motionTransfer && !['ref_images', 'ref_videos', 'ref_audios'].some(name => Array.isArray(values[name]) && values[name].length))
+  if (taskType === 'r2v' && !characterSwap && !bodyRender && !motionTransfer && !relayVSR && !['ref_images', 'ref_videos', 'ref_audios'].some(name => Array.isArray(values[name]) && values[name].length))
     throw new Error('请至少上传一项参考图片、音频或视频')
 }
 
@@ -124,7 +125,7 @@ export function recoverTextToVideoGenerations(editor: EditorCore) {
   let tracks = editor.timeline.getTracks()
   let changed = false
   for (const scene of planning.scenes) for (const shot of scene.shots) {
-    if (shot.taskType === 'r2v' && !['Ref2VA', 'CharacterSwap', 'BodyRender', 'MotionTransfer'].includes(String(scene.settings.task_type))) continue
+    if (shot.taskType === 'r2v' && !['Ref2VA', 'CharacterSwap', 'BodyRender', 'MotionTransfer', 'RelayVSR'].includes(String(scene.settings.task_type))) continue
     if (shot.taskType === 'v2v' && !['V2VA', 'V2VARef'].includes(String(scene.settings.task_type))) continue
     if (!['t2v', 'i2v', 'fl2v', 'r2v', 'v2v'].includes(shot.taskType) || !['queued', 'running'].includes(shot.generationStatus) || activeRequests.has(shot.generationId ?? '')) continue
     changed = true
@@ -159,13 +160,15 @@ export function updateTextToVideoTiming(planning: EditingDirectorPlanningState, 
 
 export function saveTextToVideoDraft(planning: EditingDirectorPlanningState, position: GenerationPosition, values: Record<string, unknown>, shotId?: string) {
   const motionTransfer = values.task_type === 'MotionTransfer'
-  const duration = motionTransfer ? Number(values.duration) : Math.min(15, Math.max(4, Number(values.duration)))
-  if (motionTransfer && (!Number.isFinite(duration) || duration <= 0)) throw new Error('生成时长需要大于 0 秒')
+  const relayVSR = values.task_type === 'RelayVSR'
+  const usesSourceDuration = motionTransfer || relayVSR
+  const duration = usesSourceDuration ? Number(values.duration) : Math.min(15, Math.max(4, Number(values.duration)))
+  if (usesSourceDuration && (!Number.isFinite(duration) || duration <= 0)) throw new Error('生成时长需要大于 0 秒')
   const referenceEdit = values.task_type === 'V2VARef'
   const characterSwap = values.task_type === 'CharacterSwap'
   const bodyRender = values.task_type === 'BodyRender'
-  const taskType = values.task_type === 'V2VA' || referenceEdit ? 'v2v' : values.task_type === 'Ref2VA' || characterSwap || bodyRender || motionTransfer ? 'r2v' : values.task_type === 'FL2VA' ? 'fl2v' : values.task_type === 'I2VA' ? 'i2v' : 't2v'
-  const title = motionTransfer ? '动作迁移' : bodyRender ? '视频转白模' : characterSwap ? '人物替换' : referenceEdit ? '视频+参考修改' : { t2v: '文生视频', i2v: '图生视频', fl2v: '首尾帧生视频', r2v: '多参考生视频', v2v: '视频编辑' }[taskType]
+  const taskType = values.task_type === 'V2VA' || referenceEdit ? 'v2v' : values.task_type === 'Ref2VA' || characterSwap || bodyRender || motionTransfer || relayVSR ? 'r2v' : values.task_type === 'FL2VA' ? 'fl2v' : values.task_type === 'I2VA' ? 'i2v' : 't2v'
+  const title = relayVSR ? 'Relay VSR 视频放大' : motionTransfer ? '动作迁移' : bodyRender ? '视频转白模' : characterSwap ? '人物替换' : referenceEdit ? '视频+参考修改' : { t2v: '文生视频', i2v: '图生视频', fl2v: '首尾帧生视频', r2v: '多参考生视频', v2v: '视频编辑' }[taskType]
   const firstFrame = typeof values.first_frame === 'string' ? values.first_frame || undefined : undefined
   const imageAssetId = taskType === 'i2v' ? firstFrame : undefined
   const firstFrameAssetId = taskType === 'fl2v' ? firstFrame : undefined
@@ -175,7 +178,7 @@ export function saveTextToVideoDraft(planning: EditingDirectorPlanningState, pos
   const refs = motionTransfer ? ((values.character_images ?? []) as string[]).map((assetId, index) => ({ assetId, index: (values.character_slots as number[] | undefined)?.[index] ?? index }))
     : bodyRender ? [] : characterSwap ? (values.character_image ? [{ assetId: String(values.character_image), index: 0 }] : []) : references('ref_images')
   const refAudios = characterSwap || bodyRender || motionTransfer ? [] : references('ref_audios')
-  const refVideos = characterSwap || bodyRender || motionTransfer ? (values.source_video ? [{ assetId: String(values.source_video), index: 0 }] : []) : taskType === 'v2v' && Array.isArray(values.ref_videos)
+  const refVideos = characterSwap || bodyRender || motionTransfer || relayVSR ? (values.source_video ? [{ assetId: String(values.source_video), index: 0 }] : []) : taskType === 'v2v' && Array.isArray(values.ref_videos)
     ? (values.ref_videos as string[]).slice(0, 1).map(assetId => ({ assetId, index: 0 })) : references('ref_videos')
   let next = planning
   if (!shotId) {
@@ -188,7 +191,7 @@ export function saveTextToVideoDraft(planning: EditingDirectorPlanningState, pos
   if (taskType === 'v2v') settings.ref_videos = refVideos.map(ref => ref.assetId)
   next = { ...next, selectedShotId: shotId, scenes: next.scenes.map(scene => scene.id === shot.sceneId
     ? { ...scene, title, settings: { ...scene.settings, ...settings, directorTaskType: taskType, duration } } : scene) }
-  const prompt = motionTransfer ? '' : String(bodyRender ? values.subject_prompt ?? '' : values.prompt ?? '')
+  const prompt = motionTransfer || relayVSR ? '' : String(bodyRender ? values.subject_prompt ?? '' : values.prompt ?? '')
   return updateDirectorShot(next, shotId, { title, taskType, imageAssetId, firstFrameAssetId, lastFrameAssetId, refs, refVideos, refAudios, prompt, duration, targetDuration: duration,
     sourceSnapshot: { ...shot.sourceSnapshot, duration, imageAssetId: imageAssetId ?? null, firstFrameAssetId: firstFrameAssetId ?? null,
       lastFrameAssetId: lastFrameAssetId ?? null, refs, refVideos, refAudios, prompt } })
@@ -212,7 +215,8 @@ async function runTextToVideo(editor: EditorCore, shotId: string, moduleId: stri
   const characterSwap = scene.settings.task_type === 'CharacterSwap'
   const bodyRender = scene.settings.task_type === 'BodyRender'
   const motionTransfer = scene.settings.task_type === 'MotionTransfer'
-  const referenceToVideo = shot.taskType === 'r2v' && !characterSwap && !bodyRender && !motionTransfer
+  const relayVSR = scene.settings.task_type === 'RelayVSR'
+  const referenceToVideo = shot.taskType === 'r2v' && !characterSwap && !bodyRender && !motionTransfer && !relayVSR
   const videoEdit = shot.taskType === 'v2v'
   const referenceEdit = videoEdit && scene.settings.task_type === 'V2VARef'
   const imageToVideo = shot.taskType === 'i2v' || firstLastFrames
@@ -243,7 +247,12 @@ async function runTextToVideo(editor: EditorCore, shotId: string, moduleId: stri
   try {
     await editor.save.flush()
     if (!current()) return
-    const generationValues = bodyRender ? {
+    const { seed_mode, seed: fixedSeed, ...workflowValues } = values
+    let seed = fixedSeed == null ? undefined : Number(fixedSeed)
+    if (!bodyRender && seed_mode === 'random') seed = Math.floor(Math.random() * 100_000_000)
+    const generationValues = relayVSR ? {
+      task_type: 'RelayVSR', source_video: values.source_video, scale: values.scale, detail: values.detail
+    } : bodyRender ? {
       task_type: 'BodyRender', source_video: values.source_video, subject_prompt: values.subject_prompt,
       output_mode: 'colored', start_time: 0, duration: 0, frame_rate: values.frame_rate ?? 24,
       longest_side: values.longest_side ?? 736, audio_mode: 'source'
@@ -251,10 +260,11 @@ async function runTextToVideo(editor: EditorCore, shotId: string, moduleId: stri
       task_type: 'MotionTransfer', source_video: values.source_video, character_images: values.character_images,
       character_slots: values.character_slots, duration: shot.duration, start_time: 0,
       aspect_ratio: values.aspect_ratio, megapixels: values.megapixels, longest_side: values.longest_side ?? 736,
-      seed: -1, prompt: '', enhance_prompt: String(values.prompt_api_key ?? '').trim() ? 'on' : 'off',
+      selflift_enabled: values.selflift_enabled, refine_enabled: values.refine_enabled, refine_megapixels: values.refine_megapixels,
+      seed, prompt: '', enhance_prompt: String(values.prompt_api_key ?? '').trim() ? 'on' : 'off',
       prompt_api_key: String(values.prompt_api_key ?? '').trim(), prompt_model: values.prompt_model,
       audio_mode: values.audio_mode === 'mute' ? 'mute' : 'source'
-    } : characterSwap ? { ...values, duration: shot.duration, start_time: 0, task_type: 'CharacterSwap' } : { ...values, duration: shot.duration, task_type: referenceEdit ? 'V2VARef' : videoEdit ? 'V2VA' : referenceToVideo ? 'Ref2VA' : firstLastFrames ? 'FL2VA' : imageToVideo ? 'I2VA' : 'T2VA', enhance_prompt: values.enhance_prompt === 'off' ? 'off' : 'on', audio_mode: 'native',
+    } : characterSwap ? { ...workflowValues, seed, duration: shot.duration, start_time: 0, task_type: 'CharacterSwap' } : { ...workflowValues, seed, duration: shot.duration, task_type: referenceEdit ? 'V2VARef' : videoEdit ? 'V2VA' : referenceToVideo ? 'Ref2VA' : firstLastFrames ? 'FL2VA' : imageToVideo ? 'I2VA' : 'T2VA', enhance_prompt: values.enhance_prompt === 'off' ? 'off' : 'on', audio_mode: 'native',
       first_frame: imageToVideo ? values.first_frame : '', last_frame: firstLastFrames ? values.last_frame : '',
       ref_images: referenceToVideo || referenceEdit ? values.ref_images ?? [] : [], ref_videos: videoEdit ? (values.ref_videos as string[]).slice(0, 1) : referenceToVideo ? values.ref_videos ?? [] : [], ref_audios: referenceToVideo || referenceEdit ? values.ref_audios ?? [] : [], drive_audio: '', final_audio: '' }
     const files = await request<Array<{ filename: string; subfolder: string; type: string }>>('capcut:run-workflow' as never,

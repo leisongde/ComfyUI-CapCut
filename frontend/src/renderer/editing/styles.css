@@ -5740,6 +5740,8 @@ progress {
 .text-to-video-form .image-to-video-caption button { padding: 4px 8px; }
 .text-to-video-form input:read-only { color: var(--muted-foreground); }
 .text-to-video-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.text-to-video-form .text-to-video-switch { display: flex; align-items: center; justify-content: space-between; }
+.text-to-video-form .text-to-video-switch button { padding: 0; }
 .generation-media-group { display: grid; gap: 8px; min-width: 0; }
 .generation-media-group > strong { font-size: 12px; }
 .frame-swap-actions { display: flex; justify-content: flex-end; }

@@ -7,9 +7,9 @@ const sourceUrl = new URL("../web/motion-transfer.js", import.meta.url);
 const template = JSON.parse(await readFile(new URL("../web/workflows/motion_transfer.json", import.meta.url), "utf8"));
 const file = filename => ({ filename, subfolder: "CapCut/default/project", type: "input" });
 
-async function adapter(api = {}, random = Math.random) {
+async function adapter(api = {}) {
     const providers = new Map();
-    const context = vm.createContext({ structuredClone, URL, Math: Object.assign(Object.create(Math), { random }), setTimeout: callback => { callback(); },
+    const context = vm.createContext({ structuredClone, URL, setTimeout: callback => { callback(); },
         fetch: async () => ({ ok: true, json: async () => structuredClone(template) }) });
     const editor = new vm.SyntheticModule(["registerCapCutWorkflow"], function () {
         this.setExport("registerCapCutWorkflow", (type, provider) => providers.set(type, provider));
@@ -119,16 +119,12 @@ test("the six reference slots map to their original upload nodes and keep source
     assert.ok(!Object.values(sparse).some(node => /GPT/.test(node.class_type)));
 });
 
-test("random seeds are selected afresh for node 314 without changing the packaged template", async () => {
-    const samples = [0.25, 0.75];
-    const { buildMotionTransferPrompt, values } = await adapter({}, () => samples.shift());
-    assert.equal(values.seed, -1);
-    const first = buildMotionTransferPrompt(template, {}, values)["314"].inputs.noise_seed;
-    const second = buildMotionTransferPrompt(template, {}, values)["314"].inputs.noise_seed;
-    assert.equal(first, Math.floor(0.25 * Number.MAX_SAFE_INTEGER));
-    assert.equal(second, Math.floor(0.75 * Number.MAX_SAFE_INTEGER));
-    assert.notEqual(first, second);
-    assert.equal(template["314"].inputs.noise_seed, 0);
+test("node 314 uses the template's fixed seed for new and old drafts", async () => {
+    const { buildMotionTransferPrompt, values } = await adapter();
+    const fixed = template["314"].inputs.noise_seed;
+    assert.equal(values.seed, fixed);
+    for (const seed of [values.seed, undefined, -1, "-1"])
+        assert.equal(buildMotionTransferPrompt(template, {}, { ...values, seed })["314"].inputs.noise_seed, fixed);
 });
 
 test("caption numbering and the six source colors match the ordered images without unused character text", async () => {
@@ -190,20 +186,42 @@ test("provider checks only active dependencies and returns the result belonging 
     await assert.rejects(() => provider.run({ node: { widgets: [] }, values: { ...values, enhance_prompt: "on", prompt_api_key: "test-placeholder" } }), /缺少动作迁移节点/);
 });
 
-test("the unified workflow connects all four modules without dangling links", async () => {
+test("the unified workflow connects five modules and both sampling options without dangling links", async () => {
     const workflow = JSON.parse(await readFile(new URL("../examples/MiniMax_剪辑版.json", import.meta.url), "utf8"));
-    assert.equal(workflow.links.length, 4);
+    const nodes = new Map(workflow.nodes.map(node => [node.id, node]));
     const main = workflow.nodes.find(node => node.type === "CapCutMainConsole");
-    const modules = workflow.nodes.filter(node => node.outputs?.some(output => output.type === "CAPCUT_WORKFLOW"));
-    assert.deepEqual(modules.map(node => node.type).sort(), ["CapCutMiniMaxH3Workflow", "CapCutMiniMaxH3CharacterSwapWorkflow", "CapCutBodyRenderWorkflow", "CapCutMotionTransferWorkflow"].sort());
-    assert.equal(new Set(workflow.links.map(link => link[0])).size, 4);
-    assert.equal(new Set(workflow.links.map(link => link[1])).size, 4);
-    assert.equal(new Set(workflow.links.map(link => link[4])).size, 4);
+    const consoleLinks = workflow.links.filter(link => link[3] === main.id);
+    const modules = consoleLinks.filter(link => link[5] === "CAPCUT_WORKFLOW");
+    assert.deepEqual(modules.map(link => nodes.get(link[1]).type).sort(), [
+        "CapCutMiniMaxH3Workflow", "CapCutMiniMaxH3CharacterSwapWorkflow", "CapCutBodyRenderWorkflow",
+        "CapCutMotionTransferWorkflow", "CapCutRelayVSRWorkflow",
+    ].sort());
+    for (const [name, type, nodeType] of [
+        ["selflift", "MMX_DIR_SELFLIFT", "MiniMaxH3DirectorSelfLift"],
+        ["refine", "MMX_DIR_REFINE", "MiniMaxH3DirectorRefine"],
+    ]) {
+        const input = main.inputs.findIndex(item => item.name === name);
+        const link = consoleLinks.find(item => item[4] === input);
+        assert.equal(link?.[5], type);
+        assert.equal(nodes.get(link[1]).type, nodeType);
+    }
+    const linkIds = new Set(workflow.links.map(link => link[0]));
+    assert.equal(linkIds.size, workflow.links.length);
     for (const [id, source, slot, destination, input, type] of workflow.links) {
-        assert.equal(destination, main.id);
-        assert.equal(type, "CAPCUT_WORKFLOW");
-        assert.equal(main.inputs[input].link, id);
-        assert.ok(workflow.nodes.find(node => node.id === source).outputs[slot].links.includes(id));
+        const sourceSlot = nodes.get(source).outputs[slot];
+        const destinationSlot = nodes.get(destination).inputs[input];
+        assert.equal(sourceSlot.type, type);
+        assert.equal(destinationSlot.type, type);
+        assert.equal(destinationSlot.link, id);
+        assert.ok(sourceSlot.links.includes(id));
+    }
+    for (const node of nodes.values()) {
+        for (const item of node.inputs ?? []) {
+            if (item.link != null) assert.ok(linkIds.has(item.link));
+        }
+        for (const item of node.outputs ?? []) {
+            for (const id of item.links ?? []) assert.ok(linkIds.has(id));
+        }
     }
     assert.ok(!/sk-[A-Za-z0-9_-]{16,}|videopreview|fullpath|cos_url/.test(JSON.stringify(template)));
 });

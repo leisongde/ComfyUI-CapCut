@@ -1,3 +1,5 @@
+import os
+
 import folder_paths
 from comfy_api.latest import io
 
@@ -140,6 +142,27 @@ class CapCutMotionTransferWorkflow(io.ComfyNode):
         return io.NodeOutput(settings)
 
 
+class CapCutRelayVSRWorkflow(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="CapCutRelayVSRWorkflow",
+            display_name="CapCut Relay VSR 视频放大",
+            category="CapCut",
+            description="连接主控台后在剪辑工作台选择视频。主模型与 VAE 需使用相同的放大倍率。",
+            inputs=[
+                io.Combo.Input("unet_name", options=folder_paths.get_filename_list("diffusion_models"), default=os.path.join("RelayVSR", "relayvsr_x2_lightx2v_int8_convrot.safetensors"), display_name="主模型"),
+                io.Combo.Input("vae_name", options=folder_paths.get_filename_list("vae"), default=os.path.join("RelayVSR", "relayvsr_flash_vae_x2_fp32.safetensors"), display_name="VAE"),
+                io.Float.Input("detail", default=0.8, min=0.0, max=1.0, step=0.01, display_name="细节", tooltip="保留放大模型生成的细节比例，1 为完整的模型输出。"),
+            ],
+            outputs=[io.Custom("CAPCUT_WORKFLOW").Output(display_name="工作流")],
+        )
+
+    @classmethod
+    def execute(cls, **settings):
+        return io.NodeOutput(settings)
+
+
 class CapCutMainConsole(io.ComfyNode):
     @classmethod
     def define_schema(cls):
@@ -156,10 +179,17 @@ class CapCutMainConsole(io.ComfyNode):
                     optional=True,
                     tooltip="连接后续接入的生图、生视频或视频处理模块。",
                 ),
+                io.Custom("MMX_DIR_SELFLIFT").Input("selflift", optional=True, lazy=True, raw_link=True, display_name="SelfLift 渐进采样", tooltip="连接原版 SelfLift 节点，在镜头参数中开启渐进采样。"),
+                io.Custom("MMX_DIR_REFINE").Input("refine", optional=True, lazy=True, raw_link=True, display_name="放大与二采", tooltip="连接原版 Refine 节点，在镜头参数中开启放大与二采。"),
             ],
             is_output_node=True,
         )
 
     @classmethod
-    def execute(cls, project_name, workflows=None):
-        return io.NodeOutput(ui={"capcut": [{"name": project_name, "workflows": list((workflows or {}).values())}]})
+    def execute(cls, project_name, workflows=None, selflift=None, refine=None):
+        configuration = {"name": project_name, "workflows": list((workflows or {}).values())}
+        if selflift is not None:
+            configuration["selflift"] = selflift
+        if refine is not None:
+            configuration["refine"] = refine
+        return io.NodeOutput(ui={"capcut": [configuration]})

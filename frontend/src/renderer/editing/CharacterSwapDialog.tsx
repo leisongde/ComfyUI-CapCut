@@ -6,6 +6,7 @@ import { getMediaTypeFromFile } from '@/lib/media/media-utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { request } from './bridge'
 import { MediaUpload } from './MediaUpload'
+import { SamplingOptions } from './SamplingOptions'
 import { PromptEditor, type PromptReference } from './PromptEditor'
 import type { GenerationPosition } from './text-to-video'
 
@@ -187,8 +188,8 @@ export function CharacterSwapDialog({ open, onOpenChange, position, draftId, ini
           <label>时长（秒）<input aria-label="时长（秒）" type="number" min={4} max={15} step="any" required value={String(values.duration ?? 5)} onChange={event => update('duration', event.target.value)} /></label>
           <label>视频比例<select aria-label="视频比例" value={String(values.aspect_ratio ?? '')} onChange={event => update('aspect_ratio', event.target.value)}>{options('aspect_ratio').map(option => <option key={String(option)} value={String(option)}>{String(option)}</option>)}</select></label>
           <label>分辨率（百万像素 / MP）<input aria-label="分辨率（百万像素 / MP）" type="number" min={0.01} step="any" required value={String(values.megapixels ?? 0.4)} onChange={event => update('megapixels', event.target.value)} /></label>
-          <label>种子（-1 为随机）<input aria-label="种子" type="number" step={1} value={String(values.seed ?? -1)} onChange={event => update('seed', event.target.value)} /></label>
         </div>
+        <SamplingOptions values={values} defaultSeed={module?.fields.find(field => field.name === 'seed')?.default} update={update} />
         <label>声音处理<select aria-label="声音处理" value={String(values.audio_mode ?? 'source')} onChange={event => update('audio_mode', event.target.value)}>{options('audio_mode').map(option => <option key={typeof option === 'string' ? option : option.value} value={typeof option === 'string' ? option : option.value}>{typeof option === 'string' ? option : option.label}</option>)}</select><small>原视频没有音轨时请选择“静音”。</small></label>
       </fieldset>
       {error && <p role="alert" className="text-to-video-error">{error}</p>}

@@ -6,6 +6,7 @@ import { getMediaTypeFromFile } from '@/lib/media/media-utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { request } from './bridge'
 import { MediaUpload } from './MediaUpload'
+import { SamplingOptions } from './SamplingOptions'
 import { PromptEditor, type PromptReference } from './PromptEditor'
 import type { GenerationMode, GenerationPosition } from './text-to-video'
 
@@ -225,6 +226,7 @@ export function TextToVideoDialog({ open, onOpenChange, mode, position, draftId,
           <label>画面比例<select aria-label="画面比例" value={String(values.aspect_ratio ?? '')} onChange={event => update('aspect_ratio', event.target.value)}>{field('aspect_ratio')?.options?.map(option => <option key={String(option)} value={String(option)}>{String(option)}</option>)}</select></label>
         </div>
         <label>分辨率（百万像素 / MP）<input aria-label="分辨率（百万像素 / MP）" type="number" min={0.01} step="any" required value={String(values.megapixels ?? 0.4)} onChange={event => update('megapixels', event.target.value)} /><small>沿用原工作流的分辨率设置，例如 0.4 MP。</small></label>
+        <SamplingOptions values={values} defaultSeed={field('seed')?.default} update={update} />
         {enhancementEnabled && <><label>API Key<input aria-label="API Key" type="password" autoComplete="off" required value={String(values.prompt_api_key ?? '')} onBlur={() => { void saveKey().catch(error => setError(`Key 保存失败：${error.message}`)); void refreshModels() }} onChange={event => {
           modelRequest.current++
           setLoadingModels(false)

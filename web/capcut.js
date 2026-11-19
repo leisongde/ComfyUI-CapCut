@@ -4,6 +4,7 @@ import "./minimax.js";
 import "./character-swap.js";
 import "./body-render.js";
 import "./motion-transfer.js";
+import "./relay-vsr.js";
 
 const stylesheet = document.createElement("link");
 stylesheet.rel = "stylesheet";

@@ -35,6 +35,8 @@ test("direct generation preserves the supplied model and sampling graph without 
     const { buildMinimaxPrompt, values } = await adapter();
     const prompt = buildMinimaxPrompt(template, {}, values);
     assert.equal(prompt["7"].inputs.steps, 8);
+    assert.equal(prompt["9"].inputs.noise_seed, template["9"].inputs.noise_seed);
+    assert.equal(buildMinimaxPrompt(template, {}, { ...values, seed: -1 })["9"].inputs.noise_seed, template["9"].inputs.noise_seed);
     assert.equal(prompt["7"].inputs.sampler_name, "dual_clock_euler");
     assert.equal(prompt["62"].inputs.block_range_start, 25);
     assert.equal(prompt["62"].inputs.block_range_end, 49);
@@ -452,6 +454,55 @@ test("submission queues only the fixed prompt and returns only this task's saved
     assert.equal(files[0].filename, result.filename);
     assert.equal(queued.output["6"].inputs.prompt, values.prompt);
     assert.equal(queued.output["73"], undefined);
+});
+
+test("sampling switches queue only the connected branches and route the refined result to decode", async () => {
+    let queued, reads = 0;
+    const graph = {
+        "1": { class_type: "CapCutMainConsole", inputs: { selflift: [158, 0], refine: [165, 0] } },
+        "158": { class_type: "MiniMaxH3DirectorSelfLift", inputs: { highres_steps: 2 } },
+        "165": { class_type: "MiniMaxH3DirectorRefine", inputs: { mode: "upscale", sigmas: [163, 0], megapixels: 2, skip_fl2v: true, confirm_first_pass: true } },
+        "163": { class_type: "BasicScheduler", inputs: { model: [168, 0], steps: 4 } },
+        "168": { class_type: "UNETLoader", inputs: { unet_name: "refine.safetensors" } },
+        "999": { class_type: "UnrelatedNode", inputs: {} },
+    };
+    const { provider, values } = await adapter({
+        getNodeDefs: async () => Object.fromEntries([
+            ...Object.values(template).map(node => node.class_type), ...Object.values(graph).map(node => node.class_type),
+            "CapCutSelfLiftSampler", "CapCutRefineSampler", "LoadImage",
+        ].map(type => [type, {}])),
+        queuePrompt: async (_, payload) => { queued = payload.output; return { prompt_id: "sampling" }; },
+        fetchApi: async () => ({ ok: true, json: async () => ({ sampling: { status: { completed: true }, outputs: { "12": { gifs: [{ filename: "result.mp4" }] } } } }) }),
+    });
+    assert.equal(values.refine_megapixels, 1);
+    const node = { widgets: [], graph: { serialize: () => ({}) } };
+    const getConsolePrompt = async () => { reads++; return { consoleId: "1", output: graph }; };
+    for (const selflift of [false, true]) for (const refine of [false, true]) {
+        await provider.run({ node, getConsolePrompt, values: { ...values, selflift_enabled: selflift, refine_enabled: refine,
+            task_type: "FL2VA", first_frame: [file("first.png")], last_frame: [file("last.png")], refine_megapixels: refine && selflift ? 1.4 : undefined } });
+        assert.equal(queued["16"].inputs.megapixels, 0.4);
+        assert.equal(queued["10"].class_type, selflift ? "CapCutSelfLiftSampler" : "SamplerCustomAdvanced");
+        assert.equal(Boolean(queued.capcut_sampling_158), selflift);
+        assert.equal(Boolean(queued.capcut_sampling_165), refine);
+        assert.equal(queued["11"].inputs.av_latent[0], refine ? "capcut_refine" : "10");
+        assert.equal(queued.capcut_sampling_999, undefined);
+        if (refine) {
+            assert.equal(queued.capcut_sampling_165.inputs.megapixels, selflift ? 1.4 : 1);
+            assert.equal(queued.capcut_sampling_165.inputs.skip_fl2v, false);
+            assert.equal(queued.capcut_sampling_165.inputs.confirm_first_pass, false);
+            assert.equal(queued.capcut_sampling_163.inputs.model[0], "capcut_sampling_168");
+            assert.equal(queued.capcut_refine.inputs.latent[0], "10");
+            assert.equal(queued.capcut_refine.inputs.first_frame[0], "71");
+            assert.equal(queued.capcut_refine.inputs.last_frame[0], "72");
+        }
+        for (const item of Object.values(queued)) for (const input of Object.values(item.inputs)) {
+            if (Array.isArray(input)) assert.ok(queued[input[0]], `Dangling link ${input[0]}`);
+        }
+    }
+    assert.equal(reads, 3);
+    assert.equal(graph["165"].inputs.megapixels, 2);
+    await assert.rejects(provider.run({ node, values: { ...values, selflift_enabled: true },
+        getConsolePrompt: async () => ({ consoleId: "1", output: {} }) }), /接到当前主控台/);
 });
 
 test("missing dependencies fail before submitting a generation task", async () => {

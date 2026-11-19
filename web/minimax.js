@@ -1,7 +1,14 @@
 import { api } from "../../scripts/api.js";
 import { registerCapCutWorkflow } from "./editor.js";
 
+export const samplingFields = [
+    { name: "selflift_enabled", label: "SelfLift 渐进采样", type: "boolean", default: false },
+    { name: "refine_enabled", label: "放大与二采", type: "boolean", default: false },
+    { name: "refine_megapixels", label: "放大分辨率（百万像素 / MP）", type: "number", default: 1, min: 0.1, max: 16, step: 0.1 },
+];
+
 export const fields = [
+    ...samplingFields,
     { name: "system_prompt", label: "系统提示词", type: "textarea", default: "" },
     { name: "prompt", label: "提示词", type: "textarea", default: "一个女人，走在乌镇的石板路上，穿着旗袍，打着油纸伞。不要背景音乐。" },
     { name: "prompt_skill", label: "Skill", type: "select", default: "MiniMax H3 提示词编写 [write-seedance-video-prompts]", options: ["MiniMax H3 提示词编写 [write-seedance-video-prompts]"] },
@@ -22,7 +29,7 @@ export const fields = [
         "3:4 (Portrait Standard)", "3:2 (Photo)", "2:3 (Portrait Photo)", "21:9 (Ultrawide)",
     ] },
     { name: "megapixels", label: "生成分辨率（百万像素）", type: "number", default: 0.4, step: 0.1 },
-    { name: "seed", label: "种子（-1 为随机）", type: "number", default: -1 },
+    { name: "seed", label: "固定种子", type: "number", default: 375540071883589, min: 0, step: 1 },
     { name: "first_frame", label: "首帧图片", type: "media", kind: "image", default: "" },
     { name: "last_frame", label: "尾帧图片", type: "media", kind: "image", default: "" },
     { name: "ref_images", label: "参考图片（按下方编号对应 Picture）", type: "media", kind: "image", multiple: true, default: [] },
@@ -75,6 +82,75 @@ const referenceNodes = {
     ref_videos: ["66", "67", "68"],
 };
 
+export async function applySamplingOptions(prompt, values, getConsolePrompt, samplerId, inputs, uncrop) {
+    if (values.selflift_enabled !== true && values.refine_enabled !== true) return;
+    const { consoleId, output } = await getConsolePrompt();
+    const consoleInputs = output[consoleId]?.inputs;
+    const copied = new Map();
+    const copyUpstream = ([id, slot]) => {
+        if (!copied.has(id)) {
+            const source = output[id];
+            if (!source) throw new Error(`采样节点的上游接线无效：${id}`);
+            const targetId = `capcut_sampling_${id}`;
+            copied.set(id, targetId);
+            prompt[targetId] = { class_type: source.class_type, inputs: Object.fromEntries(
+                Object.entries(source.inputs).map(([name, value]) => [name, Array.isArray(value) ? copyUpstream(value) : value])
+            ) };
+        }
+        return [copied.get(id), slot];
+    };
+    const connected = (port, type, label) => {
+        const link = consoleInputs?.[port];
+        if (!Array.isArray(link) || output[link[0]]?.class_type !== type) {
+            throw new Error(`请把「${label}」节点接到当前主控台，并确认节点已启用`);
+        }
+        return copyUpstream(link);
+    };
+    const consumers = Object.values(prompt).flatMap(node => Object.entries(node.inputs)
+        .filter(([, value]) => Array.isArray(value) && value[0] === samplerId)
+        .map(([name]) => [node.inputs, name]));
+
+    const { latent, sigmas, first_frame, last_frame, ...common } = inputs;
+    if (values.selflift_enabled === true) {
+        const selflift = connected("selflift", "MiniMaxH3DirectorSelfLift", "SelfLift 渐进采样");
+        prompt[samplerId] = { class_type: "CapCutSelfLiftSampler", inputs: { ...common, latent, sigmas, selflift } };
+        for (const [consumer, name] of consumers) consumer[name] = [samplerId, 0];
+    }
+    if (values.refine_enabled === true) {
+        const megapixels = Number(values.refine_megapixels ?? 1);
+        if (!Number.isFinite(megapixels) || megapixels < 0.1 || megapixels > 16) throw new Error("放大分辨率需要在 0.1 到 16 MP 之间");
+        const refine = connected("refine", "MiniMaxH3DirectorRefine", "放大与二采");
+        const config = prompt[refine[0]].inputs;
+        if (!config.sigmas) throw new Error("请给放大与二采节点的 sigmas 输入接上调度器");
+        Object.assign(config, { megapixels, mode: "upscale", skip_fl2v: false, confirm_first_pass: false });
+        const sampled = consumers[0][0][consumers[0][1]];
+        prompt.capcut_refine = { class_type: "CapCutRefineSampler", inputs: {
+            ...common, latent: sampled, refine,
+            ...(first_frame && { first_frame }), ...(last_frame && { last_frame }),
+            ...(uncrop && { uncrop_width: uncrop.width, uncrop_height: uncrop.height }),
+        } };
+        for (const [consumer, name] of consumers) consumer[name] = ["capcut_refine", 0];
+        if (uncrop) {
+            const save = prompt[uncrop.saveId].inputs;
+            prompt.capcut_refine_canvas = { class_type: "ImageScale", inputs: {
+                image: save.images, width: ["capcut_refine", 1], height: ["capcut_refine", 2], upscale_method: "lanczos", crop: "disabled",
+            } };
+            save.images = ["capcut_refine_canvas", 0];
+        }
+    }
+}
+
+export function samplingPercent(data, values) {
+    const share = Math.max(0, Math.min(1, data.value / data.max));
+    if (values.refine_enabled !== true) return Math.round(share * 100);
+    return Math.round(share * 50) + (String(data.node) === "capcut_refine" ? 50 : 0);
+}
+
+export function fixedSeed(value, fallback) {
+    const seed = Number(value ?? -1);
+    return seed === -1 ? fallback : seed;
+}
+
 export function buildMinimaxPrompt(template, configuration, values) {
     const prompt = structuredClone(template);
     const conditioning = prompt["6"].inputs;
@@ -89,7 +165,8 @@ export function buildMinimaxPrompt(template, configuration, values) {
     prompt["14"].inputs.value = duration;
     prompt["16"].inputs.aspect_ratio = values.aspect_ratio;
     prompt["16"].inputs.megapixels = Number(values.megapixels);
-    prompt["9"].inputs.noise_seed = Number(values.seed) === -1 ? Math.floor(Math.random() * Number.MAX_SAFE_INTEGER) : Number(values.seed);
+    const noise = prompt["9"].inputs;
+    noise.noise_seed = fixedSeed(values.seed, noise.noise_seed);
     const referenceEdit = values.task_type === "V2VARef";
     const videoEdit = values.task_type === "V2VA" || referenceEdit;
     let combinedPrompt = [values.system_prompt, values.prompt].filter(value => value?.trim()).join(",");
@@ -179,7 +256,8 @@ export async function waitForVideo(promptId, onProgress, outputNodeId = "12") {
             const failure = entry.status?.messages?.find(item => ["execution_error", "execution_interrupted"].includes(item[0]));
             if (failure || entry.status?.status_str === "error") throw new Error(failure?.[1]?.exception_message ?? "生成任务失败或已中断，请查看 ComfyUI 队列");
             if (entry.status?.completed) {
-                const videos = (entry.outputs?.[outputNodeId]?.gifs ?? []).filter(file => /\.(mp4|webm|mov|mkv)$/i.test(file.filename));
+                const output = entry.outputs?.[outputNodeId];
+                const videos = [...(output?.gifs ?? []), ...(output?.images ?? [])].filter(file => /\.(mp4|webm|mov|mkv)$/i.test(file.filename));
                 if (!videos.length) throw new Error("任务已完成，但没有保存的视频结果");
                 return videos.map(({ filename, subfolder, type }) => ({ filename, subfolder, type }));
             }
@@ -205,16 +283,26 @@ registerCapCutWorkflow("CapCutMiniMaxH3Workflow", {
     getFields,
     usesMedia: values => values.task_type !== "T2VA",
     loadModels,
-    async run({ node, values, onProgress }) {
+    async run({ node, values, onProgress, getConsolePrompt }) {
         const response = await fetch(new URL("./workflows/minimax_h3.json", import.meta.url));
         if (!response.ok) throw new Error("无法读取内置 MiniMax 工作流，请刷新页面后重试");
         const configuration = Object.fromEntries(node.widgets.map(widget => [widget.name, widget.value]));
         const output = buildMinimaxPrompt(await response.json(), configuration, values);
+        await applySamplingOptions(output, values, getConsolePrompt, "10", {
+            latent: ["6", 1], positive: ["6", 0], model: ["78", 0], video_vae: ["4", 0], sigmas: ["7", 2],
+            seed: output["9"].inputs.noise_seed, shift_video: output["7"].inputs.shift_video, shift_audio: output["7"].inputs.shift_audio,
+            first_frame: output["6"].inputs.first_frame, last_frame: output["6"].inputs.last_frame,
+        });
+        if (values.selflift_enabled === true) {
+            delete output["8"];
+            delete output["9"];
+        }
         const definitions = await api.getNodeDefs();
         const missing = [...new Set(Object.values(output).map(item => item.class_type))].filter(type => !definitions[type]);
         if (missing.length) throw new Error(`缺少工作流节点：${missing.join("、")}。请安装原工作流依赖并重启 ComfyUI`);
         let promptId;
-        const stages = { "62": "加载视频模型", "3": "加载文本编码器", "73": "提示词增强", "6": "准备视频条件", "7": "配置采样器", "10": "视频采样", "11": "视频解码", "12": "保存视频" };
+        const stages = { "62": "加载视频模型", "3": "加载文本编码器", "73": "提示词增强", "6": "准备视频条件", "7": "配置采样器", "10": values.selflift_enabled === true ? "SelfLift 渐进采样" : "视频采样", capcut_refine: "放大与二采", "11": "视频解码", "12": "保存视频" };
+        const samplingNodes = ["10", "capcut_refine"];
         const executing = event => {
             if (event.detail.prompt_id !== promptId || !promptId) return;
             const stage = stages[String(event.detail.node)];
@@ -222,27 +310,26 @@ registerCapCutWorkflow("CapCutMiniMaxH3Workflow", {
         };
         const samplingProgress = data => {
             if (!(data.max > 0) || !Number.isFinite(data.value)) return;
-            onProgress({ status: "running", percent: Math.min(100, Math.max(0, Math.round(data.value / data.max * 100))), stage: `视频采样 ${data.value}/${data.max} 步` });
+            onProgress({ status: "running", percent: samplingPercent(data, values), stage: `${stages[String(data.node)]} ${data.value}/${data.max} 步` });
         };
         const progress = event => {
             const data = event.detail;
-            if (data.prompt_id !== promptId || !promptId || String(data.node) !== "10") return;
+            if (data.prompt_id !== promptId || !promptId || !samplingNodes.includes(String(data.node))) return;
             samplingProgress(data);
         };
         const progressState = event => {
             const data = event.detail;
             if (data.prompt_id !== promptId || !promptId) return;
             const active = Object.entries(data.nodes ?? {}).find(([id, state]) => state.state === "running" && stages[id]);
-            if (active && active[0] !== "10") {
+            if (active && !samplingNodes.includes(active[0])) {
                 onProgress({ status: "running", stage: stages[active[0]] });
                 return;
             }
-            const sampling = data.nodes?.["10"];
-            if (sampling) samplingProgress(sampling);
+            if (active) samplingProgress({ ...active[1], node: active[0] });
         };
         const cached = event => {
             if (event.detail.prompt_id === promptId && promptId && event.detail.nodes?.map(String).includes("10"))
-                onProgress({ status: "running", percent: 100, stage: "采样结果已从缓存读取" });
+                onProgress({ status: "running", percent: values.refine_enabled === true ? 50 : 100, stage: "采样结果已从缓存读取" });
         };
         if (onProgress) {
             api.addEventListener("executing", executing);

@@ -38,6 +38,8 @@ test("the fixed graph retains tracking, masked AV sampling and uncrop without sa
     assert.equal(prompt["122"].inputs.strength_model, 1);
     assert.equal(prompt["43"].inputs.video, "CapCut/default/project/original.mp4");
     assert.equal(prompt["43"].inputs.force_rate, 24);
+    assert.equal(prompt["31"].inputs.noise_seed, template["31"].inputs.noise_seed);
+    assert.equal(buildCharacterSwapPrompt(template, {}, { ...values, seed: -1 })["31"].inputs.noise_seed, template["31"].inputs.noise_seed);
     assert.equal(prompt["43"].inputs.format, "None");
     assert.equal(prompt["9"].inputs.image, "CapCut/default/project/person.png");
     assert.match(values.prompt, /^Replace only the woman in the foreground in <Video 1>/);

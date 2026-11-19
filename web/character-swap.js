@@ -1,8 +1,9 @@
 import { api } from "../../scripts/api.js";
 import { registerCapCutWorkflow } from "./editor.js";
-import { fields as minimaxFields, getFields, loadModels, waitForVideo } from "./minimax.js";
+import { fields as minimaxFields, getFields, loadModels, waitForVideo, samplingFields, applySamplingOptions, samplingPercent, fixedSeed } from "./minimax.js";
 
 export const fields = [
+    ...samplingFields,
     { name: "source_video", label: "原视频（必选）", type: "media", kind: "video", default: "" },
     { name: "character_image", label: "替换人物图片（必选）", type: "media", kind: "image", default: "" },
     { name: "subject_prompt", label: "原片中要替换的人（SAM3 定位描述，建议英文）", type: "textarea", default: "girl in pink dress" },
@@ -15,7 +16,7 @@ export const fields = [
         "3:4 (Portrait Standard)", "3:2 (Photo)", "2:3 (Portrait Photo)", "21:9 (Ultrawide)",
     ] },
     { name: "megapixels", label: "输出分辨率（百万像素）", type: "number", default: 0.4, step: 0.1 },
-    { name: "seed", label: "种子（-1 为随机）", type: "number", default: -1 },
+    { name: "seed", label: "固定种子", type: "number", default: 0, min: 0, step: 1 },
     { name: "audio_mode", label: "声音处理", type: "select", default: "source", options: [
         { value: "source", label: "保留原声（原视频需含音轨）" },
         { value: "reconstruct", label: "原工作流音轨（VAE 重建）" },
@@ -73,7 +74,8 @@ export function buildCharacterSwapPrompt(template, configuration, values) {
     prompt["17"].inputs.value = duration;
     prompt["20"].inputs.aspect_ratio = values.aspect_ratio;
     prompt["20"].inputs.megapixels = megapixels;
-    prompt["31"].inputs.noise_seed = Number(values.seed) === -1 ? Math.floor(Math.random() * Number.MAX_SAFE_INTEGER) : Number(values.seed);
+    const noise = prompt["31"].inputs;
+    noise.noise_seed = fixedSeed(values.seed, noise.noise_seed);
     if (values.audio_mode === "mute") {
         prompt.silence_duration = { class_type: "ComfyMathExpression", inputs: { expression: "a / 24", "values.a": ["19", 1] } };
         prompt.silence = { class_type: "EmptyAudio", inputs: { duration: ["silence_duration", 0], sample_rate: 44100, channels: 2 } };
@@ -89,16 +91,21 @@ registerCapCutWorkflow("CapCutMiniMaxH3CharacterSwapWorkflow", {
     fields,
     getFields: () => getFields(fields),
     loadModels,
-    async run({ node, values, onProgress }) {
+    async run({ node, values, onProgress, getConsolePrompt }) {
         const response = await fetch(new URL("./workflows/character_swap.json", import.meta.url));
         if (!response.ok) throw new Error("无法读取内置人物替换工作流，请刷新页面后重试");
         const configuration = Object.fromEntries(node.widgets.map(widget => [widget.name, widget.value]));
         const output = buildCharacterSwapPrompt(await response.json(), configuration, values);
+        await applySamplingOptions(output, values, getConsolePrompt, "21", {
+            latent: output["21"].inputs.latent_image, positive: ["11", 0], model: ["37", 0], video_vae: ["3", 0], sigmas: ["24", 0],
+            seed: output["31"].inputs.noise_seed, shift_video: output["38"].inputs.shift_video, shift_audio: output["38"].inputs.shift_audio,
+        }, { width: ["20", 0], height: ["20", 1], saveId: "42" });
+        if (values.selflift_enabled === true) for (const id of ["18", "29", "31"]) delete output[id];
         const definitions = await api.getNodeDefs();
         const missing = [...new Set(Object.values(output).map(item => item.class_type))].filter(type => !definitions[type]);
         if (missing.length) throw new Error(`缺少人物替换节点：${missing.join("、")}。请安装原工作流依赖并重启 ComfyUI`);
         let promptId;
-        const stages = { prompt_enhance: "GPT 优化人物替换提示词", "43": "读取原视频", "48": "加载 SAM3", "53": "跟踪目标人物", "56": "清理人物遮罩", "123": "裁剪人物区域", "30": "加载视频模型", "11": "准备替换条件", "21": "人物重绘采样", "7": "视频解码", "95": "回贴原画面", "42": "保存视频" };
+        const stages = { prompt_enhance: "GPT 优化人物替换提示词", "43": "读取原视频", "48": "加载 SAM3", "53": "跟踪目标人物", "56": "清理人物遮罩", "123": "裁剪人物区域", "30": "加载视频模型", "11": "准备替换条件", "21": values.selflift_enabled === true ? "SelfLift 渐进采样" : "人物重绘采样", capcut_refine: "放大与二采", "7": "视频解码", "95": "回贴原画面", "42": "保存视频" };
         const executing = event => {
             if (!promptId || event.detail.prompt_id !== promptId) return;
             const stage = stages[String(event.detail.node)];
@@ -106,8 +113,8 @@ registerCapCutWorkflow("CapCutMiniMaxH3CharacterSwapWorkflow", {
         };
         const progress = event => {
             const data = event.detail;
-            if (!promptId || data.prompt_id !== promptId || String(data.node) !== "21" || !(data.max > 0)) return;
-            onProgress({ status: "running", percent: Math.round(data.value / data.max * 100), stage: `人物重绘 ${data.value}/${data.max} 步` });
+            if (!promptId || data.prompt_id !== promptId || !["21", "capcut_refine"].includes(String(data.node)) || !(data.max > 0)) return;
+            onProgress({ status: "running", percent: samplingPercent(data, values), stage: `${stages[String(data.node)]} ${data.value}/${data.max} 步` });
         };
         if (onProgress) {
             api.addEventListener("executing", executing);

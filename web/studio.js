@@ -92,7 +92,8 @@ export async function openStudio(node, providers) {
                 payload.asset.subfolder = `CapCut/${api.user || "default"}/${payload.projectId}`;
                 payload.asset.type = "input";
             }
-            const result = await connection.provider.run({ node: connection.node, values: payload.values, settings: { width: settings.canvasSize.width, height: settings.canvasSize.height, fps: settings.fps }, clip: usesMedia ? payload.clip ?? null : null, asset: usesMedia ? payload.asset ?? null : null, onProgress });
+            const getConsolePrompt = async () => ({ consoleId: String(node.id), output: (await app.graphToPrompt(node.graph)).output });
+            const result = await connection.provider.run({ node: connection.node, getConsolePrompt, values: payload.values, settings: { width: settings.canvasSize.width, height: settings.canvasSize.height, fps: settings.fps }, clip: usesMedia ? payload.clip ?? null : null, asset: usesMedia ? payload.asset ?? null : null, onProgress });
             return Array.isArray(result) ? result : [result];
         }
         if (operation === "capcut:results") return historyFiles();

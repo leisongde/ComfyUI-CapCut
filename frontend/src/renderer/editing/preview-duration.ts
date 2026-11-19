@@ -11,7 +11,8 @@ export function getDirectorPlanningDuration(
       const startTime = Number(shot.startTime)
       const duration = Number(shot.duration)
       if (!Number.isFinite(startTime) || !Number.isFinite(duration)) continue
-      end = Math.max(end, Math.max(0, startTime) + Math.min(15, Math.max(4, duration)))
+      const length = scene.settings.task_type === 'RelayVSR' ? duration : Math.min(15, Math.max(4, duration))
+      end = Math.max(end, Math.max(0, startTime) + length)
     }
   }
   return end

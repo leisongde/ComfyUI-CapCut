@@ -729,7 +729,8 @@ export function updateDirectorShot(
           ? {
               ...shot,
               ...updates,
-              duration: scene.settings.task_type === 'MotionTransfer' ? Number(updates.duration ?? shot.duration) : asDuration(updates.duration ?? shot.duration),
+              duration: scene.settings.task_type === 'MotionTransfer' || scene.settings.task_type === 'RelayVSR'
+                ? Number(updates.duration ?? shot.duration) : asDuration(updates.duration ?? shot.duration),
               trackIndex: Number.isFinite(Number(updates.trackIndex))
                 ? Math.max(0, Math.floor(Number(updates.trackIndex)))
                 : Math.max(0, Math.floor(Number(shot.trackIndex ?? 0)))

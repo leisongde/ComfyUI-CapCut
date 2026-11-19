@@ -7,6 +7,7 @@ import { getMediaTypeFromFile } from '@/lib/media/media-utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { request } from './bridge'
 import { MediaUpload } from './MediaUpload'
+import { SamplingOptions } from './SamplingOptions'
 import type { GenerationPosition } from './text-to-video'
 
 type Field = { name: string; default: unknown; options?: string[] }
@@ -47,7 +48,7 @@ export function MotionTransferDialog({ open, onOpenChange, position, draftId, in
   useEffect(() => {
     if (!open) return
     let active = true
-    setValues({ ...initialValues, task_type: 'MotionTransfer', seed: -1, enhance_prompt: 'off' })
+    setValues({ ...initialValues, task_type: 'MotionTransfer', enhance_prompt: 'off' })
     setModule(null)
     setLoading(true)
     setUploading('')
@@ -61,7 +62,7 @@ export function MotionTransferDialog({ open, onOpenChange, position, draftId, in
       if (!connected) throw new Error('请在 ComfyUI 画布将“CapCut MiniMax H3 动作迁移”连接到主控台，再打开面板。')
       setModule(connected)
       setValues({ ...Object.fromEntries(connected.fields.map(field => [field.name, field.default])), ...initialValues,
-        task_type: 'MotionTransfer', seed: -1, enhance_prompt: 'off', prompt_api_key: saved.key })
+        task_type: 'MotionTransfer', enhance_prompt: 'off', prompt_api_key: saved.key })
     }).catch(error => { if (active) setError(error.message) }).finally(() => { if (active) setLoading(false) })
     return () => { active = false; uploadRequest.current++ }
   }, [open, draftId])
@@ -122,7 +123,7 @@ export function MotionTransferDialog({ open, onOpenChange, position, draftId, in
       }
       if (current !== uploadRequest.current) return
       const key = String(values.prompt_api_key ?? '').trim()
-      const parameters = { ...values, task_type: 'MotionTransfer', seed: -1, enhance_prompt: key ? 'on' : 'off',
+      const parameters = { ...values, task_type: 'MotionTransfer', enhance_prompt: key ? 'on' : 'off',
         prompt_api_key: key, prompt: '', audio_mode }
       if (generate) onGenerate(module.id, parameters)
       else onSave(parameters)
@@ -155,7 +156,7 @@ export function MotionTransferDialog({ open, onOpenChange, position, draftId, in
             {(asset || imageIds[index]) && <div className="image-to-video-caption"><small>{asset?.name ?? '素材已移除，请重新上传'}</small><button type="button" onClick={() => updateImage(index, '')}>移除</button></div>}
           </div>
         })}</div>
-        <small>按需要上传角色图；空位保留对应关系。提示词自动生成，每次使用随机种子。</small>
+        <small>按需要上传角色图；空位保留对应关系。提示词自动生成。</small>
         <label>API Key<input aria-label="API Key" type="password" autoComplete="off" value={String(values.prompt_api_key ?? '')}
           onChange={event => update('prompt_api_key', event.target.value)}
           onBlur={() => { void saveKey().catch(() => setError('Key 保存失败，请重新保存')) }} />
@@ -166,6 +167,7 @@ export function MotionTransferDialog({ open, onOpenChange, position, draftId, in
           <label>视频比例<select aria-label="视频比例" value={String(values.aspect_ratio ?? '')} onChange={event => update('aspect_ratio', event.target.value)}>{(module?.fields.find(field => field.name === 'aspect_ratio')?.options ?? []).map(option => <option key={option} value={option}>{option}</option>)}</select></label>
           <label>分辨率（百万像素 / MP）<input aria-label="分辨率（百万像素 / MP）" type="number" step="any" required value={String(values.megapixels ?? 0.4)} onChange={event => update('megapixels', event.target.value)} /></label>
         </div>
+        <SamplingOptions values={values} defaultSeed={module?.fields.find(field => field.name === 'seed')?.default} update={update} />
       </fieldset>
       {error && <p role="alert" className="text-to-video-error">{error}</p>}
       <div className="text-to-video-actions"><span role="status">{loading ? '正在读取工作流…' : uploading ? '正在保存素材…' : preparing ? '正在准备生成…' : busy ? '正在生成，关闭后可在轨道查看进度。' : 'MiniMax H3 动作迁移'}</span><div>
