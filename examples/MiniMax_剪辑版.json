@@ -1,1 +1,963 @@
-{"id":"96b80845-0927-4410-b8ba-e331da67938b","revision":0,"last_node_id":171,"last_link_id":14,"nodes":[{"id":1,"type":"CapCutMainConsole","pos":[2404.629107987252,50.63514011985396],"size":[350,843.5833333333334],"flags":{},"order":12,"mode":0,"inputs":[{"localized_name":"workflow_0","name":"workflows.workflow_0","shape":7,"type":"CAPCUT_WORKFLOW","link":1},{"localized_name":"workflow_1","name":"workflows.workflow_1","shape":7,"type":"CAPCUT_WORKFLOW","link":2},{"localized_name":"workflow_2","name":"workflows.workflow_2","shape":7,"type":"CAPCUT_WORKFLOW","link":3},{"localized_name":"workflow_3","name":"workflows.workflow_3","shape":7,"type":"CAPCUT_WORKFLOW","link":4},{"localized_name":"workflow_4","name":"workflows.workflow_4","shape":7,"type":"CAPCUT_WORKFLOW","link":14},{"localized_name":"workflow_5","name":"workflows.workflow_5","shape":7,"type":"CAPCUT_WORKFLOW","link":null},{"localized_name":"workflow_6","name":"workflows.workflow_6","shape":7,"type":"CAPCUT_WORKFLOW","link":null},{"localized_name":"SelfLift 渐进采样","name":"selflift","shape":7,"type":"MMX_DIR_SELFLIFT","link":6},{"localized_name":"放大与二采","name":"refine","shape":7,"type":"MMX_DIR_REFINE","link":7},{"localized_name":"工程名称","name":"project_name","type":"STRING","widget":{"name":"project_name"},"link":null}],"outputs":[],"properties":{"Node name for S&R":"CapCutMainConsole","capcut_project_id":"b1d5dd25f94c46f0b14ddd5e634aee1c"},"widgets_values":["未命名工程",null],"widgets_values_named":{"project_name":"未命名工程","打开剪辑工作台":null},"color":"#183a39","bgcolor":"#19282b"},{"id":2,"type":"CapCutMiniMaxH3Workflow","pos":[-580,50],"size":[540,360],"flags":{},"order":0,"mode":0,"inputs":[{"localized_name":"基础模型","name":"base_model","type":"STRING","widget":{"name":"base_model"},"link":null},{"localized_name":"叠加模型","name":"overlay_model","type":"STRING","widget":{"name":"overlay_model"},"link":null},{"localized_name":"文本编码器","name":"clip_name","type":"STRING","widget":{"name":"clip_name"},"link":null},{"localized_name":"视频 VAE","name":"video_vae","type":"STRING","widget":{"name":"video_vae"},"link":null},{"localized_name":"音频 VAE","name":"audio_vae","type":"STRING","widget":{"name":"audio_vae"},"link":null},{"localized_name":"加速 LoRA","name":"lora_name","type":"STRING","widget":{"name":"lora_name"},"link":null},{"localized_name":"LoRA 强度","name":"lora_strength","type":"FLOAT","widget":{"name":"lora_strength"},"link":null},{"localized_name":"采样步数","name":"steps","type":"INT","widget":{"name":"steps"},"link":null},{"localized_name":"视频 Shift","name":"shift_video","type":"FLOAT","widget":{"name":"shift_video"},"link":null},{"localized_name":"音频 Shift","name":"shift_audio","type":"FLOAT","widget":{"name":"shift_audio"},"link":null}],"outputs":[{"localized_name":"工作流","name":"工作流","type":"CAPCUT_WORKFLOW","links":[1]}],"properties":{"Node name for S&R":"CapCutMiniMaxH3Workflow"},"widgets_values":["minimax\\minimax_h3_fl2va_pruned_fp8_scaled.safetensors","minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors","qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors","minimax\\minimax_h3_video_vae_fp16.safetensors","minimax\\minimax_h3_audio_vae_fp32.safetensors","minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",1,8,12,3],"widgets_values_named":{"base_model":"minimax\\minimax_h3_fl2va_pruned_fp8_scaled.safetensors","overlay_model":"minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors","clip_name":"qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors","video_vae":"minimax\\minimax_h3_video_vae_fp16.safetensors","audio_vae":"minimax\\minimax_h3_audio_vae_fp32.safetensors","lora_name":"minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors","lora_strength":1,"steps":8,"shift_video":12,"shift_audio":3},"color":"#183a39","bgcolor":"#19282b"},{"id":3,"type":"CapCutMiniMaxH3CharacterSwapWorkflow","pos":[-580,480],"size":[620,634],"flags":{},"order":1,"mode":0,"inputs":[{"localized_name":"视频模型","name":"model_name","type":"STRING","widget":{"name":"model_name"},"link":null},{"localized_name":"文本编码器","name":"clip_name","type":"STRING","widget":{"name":"clip_name"},"link":null},{"localized_name":"视频 VAE","name":"video_vae","type":"STRING","widget":{"name":"video_vae"},"link":null},{"localized_name":"音频 VAE","name":"audio_vae","type":"STRING","widget":{"name":"audio_vae"},"link":null},{"localized_name":"SAM3 模型","name":"sam_checkpoint","type":"STRING","widget":{"name":"sam_checkpoint"},"link":null},{"localized_name":"人物替换 LoRA","name":"character_lora","type":"STRING","widget":{"name":"character_lora"},"link":null},{"localized_name":"人物 LoRA 强度","name":"character_strength","type":"FLOAT","widget":{"name":"character_strength"},"link":null},{"localized_name":"加速 LoRA","name":"turbo_lora","type":"STRING","widget":{"name":"turbo_lora"},"link":null},{"localized_name":"加速 LoRA 强度","name":"turbo_strength","type":"FLOAT","widget":{"name":"turbo_strength"},"link":null},{"localized_name":"采样步数","name":"steps","type":"INT","widget":{"name":"steps"},"link":null},{"localized_name":"视频 Shift","name":"shift_video","type":"FLOAT","widget":{"name":"shift_video"},"link":null},{"localized_name":"音频 Shift","name":"shift_audio","type":"FLOAT","widget":{"name":"shift_audio"},"link":null},{"localized_name":"Attention 后端","name":"attention","type":"COMBO","widget":{"name":"attention"},"link":null},{"localized_name":"跟踪检测阈值","name":"detection_threshold","type":"FLOAT","widget":{"name":"detection_threshold"},"link":null},{"localized_name":"最大跟踪人数","name":"max_objects","type":"INT","widget":{"name":"max_objects"},"link":null},{"localized_name":"检测间隔（帧）","name":"detect_interval","type":"INT","widget":{"name":"detect_interval"},"link":null},{"localized_name":"人物索引（留空全部）","name":"object_indices","type":"STRING","widget":{"name":"object_indices"},"link":null},{"localized_name":"遮罩清理阈值","name":"cleanup_threshold","type":"FLOAT","widget":{"name":"cleanup_threshold"},"link":null},{"localized_name":"遮罩去噪收缩","name":"cleanup_shrink","type":"INT","widget":{"name":"cleanup_shrink"},"link":null},{"localized_name":"遮罩最少持续帧","name":"cleanup_min_frames","type":"INT","widget":{"name":"cleanup_min_frames"},"link":null},{"localized_name":"遮罩边缘扩展","name":"edge_grow","type":"INT","widget":{"name":"edge_grow"},"link":null},{"localized_name":"人物裁剪倍率","name":"crop_scale","type":"FLOAT","widget":{"name":"crop_scale"},"link":null},{"localized_name":"重绘遮罩空间扩展","name":"grow_spatial","type":"INT","widget":{"name":"grow_spatial"},"link":null},{"localized_name":"重绘遮罩时间扩展","name":"grow_temporal","type":"INT","widget":{"name":"grow_temporal"},"link":null},{"localized_name":"回贴边缘羽化","name":"feather","type":"INT","widget":{"name":"feather"},"link":null}],"outputs":[{"localized_name":"工作流","name":"工作流","type":"CAPCUT_WORKFLOW","links":[2]}],"properties":{"Node name for S&R":"CapCutMiniMaxH3CharacterSwapWorkflow"},"widgets_values":["minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors","qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors","minimax\\minimax_h3_video_vae_fp16.safetensors","minimax\\minimax_h3_audio_vae_fp32.safetensors","sam3.1_multiplex_fp16.safetensors","minimax\\h3_character_swap_v1.5.safetensors",1,"minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",1,8,12,3,"comfy kitchen attention",0.5,1,1,"",0.3,12,4,16,1.75,36,1,16],"widgets_values_named":{"model_name":"minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors","clip_name":"qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors","video_vae":"minimax\\minimax_h3_video_vae_fp16.safetensors","audio_vae":"minimax\\minimax_h3_audio_vae_fp32.safetensors","sam_checkpoint":"sam3.1_multiplex_fp16.safetensors","character_lora":"minimax\\h3_character_swap_v1.5.safetensors","character_strength":1,"turbo_lora":"minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors","turbo_strength":1,"steps":8,"shift_video":12,"shift_audio":3,"attention":"comfy kitchen attention","detection_threshold":0.5,"max_objects":1,"detect_interval":1,"object_indices":"","cleanup_threshold":0.3,"cleanup_shrink":12,"cleanup_min_frames":4,"edge_grow":16,"crop_scale":1.75,"grow_spatial":36,"grow_temporal":1,"feather":16},"color":"#283e57","bgcolor":"#1c2838"},{"id":4,"type":"CapCutBodyRenderWorkflow","pos":[-580,1190],"size":[620,410],"flags":{},"order":2,"mode":0,"inputs":[{"localized_name":"SAM3 模型","name":"sam_checkpoint","type":"STRING","widget":{"name":"sam_checkpoint"},"link":null},{"localized_name":"人体检测模型","name":"detector_model","type":"STRING","widget":{"name":"detector_model"},"link":null},{"localized_name":"MoGe 模型","name":"moge_model","type":"STRING","widget":{"name":"moge_model"},"link":null},{"localized_name":"SAM3D Body 模型","name":"body_model","type":"STRING","widget":{"name":"body_model"},"link":null},{"localized_name":"最大人数","name":"max_people","type":"INT","widget":{"name":"max_people"},"link":null},{"localized_name":"SAM3 检测阈值","name":"detection_threshold","type":"FLOAT","widget":{"name":"detection_threshold"},"link":null},{"localized_name":"人体检测阈值","name":"detector_threshold","type":"FLOAT","widget":{"name":"detector_threshold"},"link":null},{"localized_name":"跟踪检测间隔（帧）","name":"detect_interval","type":"INT","widget":{"name":"detect_interval"},"link":null},{"localized_name":"人体预测批量","name":"body_batch_size","type":"INT","widget":{"name":"body_batch_size"},"link":null},{"localized_name":"MoGe 批量","name":"moge_batch_size","type":"INT","widget":{"name":"moge_batch_size"},"link":null},{"localized_name":"手部细化","name":"hand_refinement","type":"BOOLEAN","widget":{"name":"hand_refinement"},"link":null},{"localized_name":"姿态平滑窗口","name":"smoothing_window","type":"INT","widget":{"name":"smoothing_window"},"link":null},{"localized_name":"抠背景灵敏度","name":"rmbg_sensitivity","type":"FLOAT","widget":{"name":"rmbg_sensitivity"},"link":null},{"localized_name":"抠背景处理尺寸","name":"rmbg_resolution","type":"INT","widget":{"name":"rmbg_resolution"},"link":null}],"outputs":[{"localized_name":"工作流","name":"工作流","type":"CAPCUT_WORKFLOW","links":[3]}],"properties":{"Node name for S&R":"CapCutBodyRenderWorkflow"},"widgets_values":["sam3.1_multiplex_fp16.safetensors","rt_detr_v4-x-hgnet_fp16.safetensors","moge_2_vitl_normal_fp16.safetensors","sam_3d_body_dinov3_bf16.safetensors",16,0.5,0.5,1,64,4,true,9,0.95,768],"widgets_values_named":{"sam_checkpoint":"sam3.1_multiplex_fp16.safetensors","detector_model":"rt_detr_v4-x-hgnet_fp16.safetensors","moge_model":"moge_2_vitl_normal_fp16.safetensors","body_model":"sam_3d_body_dinov3_bf16.safetensors","max_people":16,"detection_threshold":0.5,"detector_threshold":0.5,"detect_interval":1,"body_batch_size":64,"moge_batch_size":4,"hand_refinement":true,"smoothing_window":9,"rmbg_sensitivity":0.95,"rmbg_resolution":768},"color":"#3d3454","bgcolor":"#282437"},{"id":5,"type":"CapCutMotionTransferWorkflow","pos":[-580,1680],"size":[620,470],"flags":{},"order":3,"mode":0,"inputs":[{"localized_name":"视频模型","name":"model_name","type":"STRING","widget":{"name":"model_name"},"link":null},{"localized_name":"文本编码器","name":"clip_name","type":"STRING","widget":{"name":"clip_name"},"link":null},{"localized_name":"视频 VAE","name":"video_vae","type":"STRING","widget":{"name":"video_vae"},"link":null},{"localized_name":"音频 VAE","name":"audio_vae","type":"STRING","widget":{"name":"audio_vae"},"link":null},{"localized_name":"动作修复 LoRA","name":"motion_lora","type":"STRING","widget":{"name":"motion_lora"},"link":null},{"localized_name":"动作修复强度","name":"motion_strength","type":"FLOAT","widget":{"name":"motion_strength"},"link":null},{"localized_name":"加速 LoRA","name":"turbo_lora","type":"STRING","widget":{"name":"turbo_lora"},"link":null},{"localized_name":"加速 LoRA 强度","name":"turbo_strength","type":"FLOAT","widget":{"name":"turbo_strength"},"link":null},{"localized_name":"采样步数","name":"steps","type":"INT","widget":{"name":"steps"},"link":null},{"localized_name":"视频 Shift","name":"shift_video","type":"FLOAT","widget":{"name":"shift_video"},"link":null},{"localized_name":"音频 Shift","name":"shift_audio","type":"FLOAT","widget":{"name":"shift_audio"},"link":null},{"localized_name":"Attention 后端","name":"attention","type":"COMBO","widget":{"name":"attention"},"link":null},{"localized_name":"启用原流程稀疏注意力","name":"sparse_attention","type":"BOOLEAN","widget":{"name":"sparse_attention"},"link":null},{"localized_name":"稀疏注意力阈值","name":"sparse_threshold","type":"FLOAT","widget":{"name":"sparse_threshold"},"link":null},{"localized_name":"参考图处理长边","name":"reference_longest_side","type":"INT","widget":{"name":"reference_longest_side"},"link":null},{"localized_name":"预览模型（Tiny VAE）","name":"tiny_vae","type":"COMBO","widget":{"name":"tiny_vae"},"link":null}],"outputs":[{"localized_name":"工作流","name":"工作流","type":"CAPCUT_WORKFLOW","links":[4]}],"title":"CapCut MiniMax H3 动作迁移（含显存清理）","properties":{"Node name for S&R":"CapCutMotionTransferWorkflow"},"widgets_values":["minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors","qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors","minimax\\minimax_h3_video_vae_fp16.safetensors","minimax\\minimax_h3_audio_vae_fp32.safetensors","minimax\\Motion_Repair_V2.safetensors",0.35,"minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",1,8,12,3,"comfy kitchen attention",true,1.1,1536,"taeh3.safetensors"],"widgets_values_named":{"model_name":"minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors","clip_name":"qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors","video_vae":"minimax\\minimax_h3_video_vae_fp16.safetensors","audio_vae":"minimax\\minimax_h3_audio_vae_fp32.safetensors","motion_lora":"minimax\\Motion_Repair_V2.safetensors","motion_strength":0.35,"turbo_lora":"minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors","turbo_strength":1,"steps":8,"shift_video":12,"shift_audio":3,"attention":"comfy kitchen attention","sparse_attention":true,"sparse_threshold":1.1,"reference_longest_side":1536,"tiny_vae":"taeh3.safetensors"},"color":"#3e4630","bgcolor":"#293023"},{"id":158,"type":"MiniMaxH3DirectorSelfLift","pos":[-518.3324980244568,-736.6958725243021],"size":[440,680],"flags":{},"order":4,"mode":0,"inputs":[{"localized_name":"model_hires","name":"model_hires","shape":7,"type":"MODEL","link":null},{"localized_name":"bd_grp_selflift_sample","name":"bd_grp_selflift_sample","type":"BDGROUP","widget":{"name":"bd_grp_selflift_sample"},"link":null},{"localized_name":"split_mode","name":"split_mode","type":"COMBO","widget":{"name":"split_mode"},"link":null},{"localized_name":"highres_steps","name":"highres_steps","type":"INT","widget":{"name":"highres_steps"},"link":null},{"localized_name":"transition_step","name":"transition_step","type":"INT","widget":{"name":"transition_step"},"link":null},{"localized_name":"lowres_scale","name":"lowres_scale","type":"FLOAT","widget":{"name":"lowres_scale"},"link":null},{"localized_name":"sampler_mode","name":"sampler_mode","type":"COMBO","widget":{"name":"sampler_mode"},"link":null},{"localized_name":"native_low_carry","name":"native_low_carry","type":"BOOLEAN","widget":{"name":"native_low_carry"},"link":null},{"localized_name":"bd_grp_selflift_lift","name":"bd_grp_selflift_lift","type":"BDGROUP","widget":{"name":"bd_grp_selflift_lift"},"link":null},{"localized_name":"latent_upscale_model","name":"latent_upscale_model","type":"COMBO","widget":{"name":"latent_upscale_model"},"link":null},{"localized_name":"latent_upsample","name":"latent_upsample","type":"COMBO","widget":{"name":"latent_upsample"},"link":null},{"localized_name":"rho","name":"rho","type":"FLOAT","widget":{"name":"rho"},"link":null},{"localized_name":"w_min","name":"w_min","type":"FLOAT","widget":{"name":"w_min"},"link":null},{"localized_name":"w_max","name":"w_max","type":"FLOAT","widget":{"name":"w_max"},"link":null},{"localized_name":"enable_latent_chunking","name":"enable_latent_chunking","type":"BOOLEAN","widget":{"name":"enable_latent_chunking"},"link":null},{"localized_name":"bd_grp_selflift_tile","name":"bd_grp_selflift_tile","type":"BDGROUP","widget":{"name":"bd_grp_selflift_tile"},"link":null},{"localized_name":"enable_tiling","name":"enable_tiling","type":"BOOLEAN","widget":{"name":"enable_tiling"},"link":null},{"localized_name":"tile_count","name":"tile_count","type":"INT","widget":{"name":"tile_count"},"link":null},{"localized_name":"tile_overlap","name":"tile_overlap","type":"INT","widget":{"name":"tile_overlap"},"link":null}],"outputs":[{"localized_name":"selflift","name":"selflift","type":"MMX_DIR_SELFLIFT","links":[6]}],"title":"158 · SelfLift 渐进采样","properties":{"cnr_id":"minimax-h3-director","ver":"4c6245e518dd8a494f3afc4f3cccd53f22d82d10","Node name for S&R":"MiniMaxH3DirectorSelfLift","ue_properties":{"widget_ue_connectable":{},"input_ue_unconnectable":{},"version":"7.8"}},"widgets_values":["渐进采样","highres_steps",2,6,0.5,"euler",true,"提升 / 3D","minimax_h3_latent_upscaler_3d_conv_v1_fp32.pth","bilinear",0,0.5,1,false,"高清分块",false,2,128],"widgets_values_named":{"bd_grp_selflift_sample":"渐进采样","split_mode":"highres_steps","highres_steps":2,"transition_step":6,"lowres_scale":0.5,"sampler_mode":"euler","native_low_carry":true,"bd_grp_selflift_lift":"提升 / 3D","latent_upscale_model":"minimax_h3_latent_upscaler_3d_conv_v1_fp32.pth","latent_upsample":"bilinear","rho":0,"w_min":0.5,"w_max":1,"enable_latent_chunking":false,"bd_grp_selflift_tile":"高清分块","enable_tiling":false,"tile_count":2,"tile_overlap":128}},{"id":163,"type":"BasicScheduler","pos":[-402.80281233388575,2809.9074720555855],"size":[440,170],"flags":{},"order":10,"mode":0,"inputs":[{"localized_name":"模型","name":"model","type":"MODEL","link":11},{"localized_name":"调度器","name":"scheduler","type":"COMBO","widget":{"name":"scheduler"},"link":null},{"localized_name":"步数","name":"steps","type":"INT","widget":{"name":"steps"},"link":null},{"localized_name":"降噪","name":"denoise","type":"FLOAT","widget":{"name":"denoise"},"link":null}],"outputs":[{"localized_name":"Sigmas","name":"SIGMAS","type":"SIGMAS","links":[5]}],"title":"163 · 二采调度器（待接模型）","properties":{"cnr_id":"comfy-core","ver":"0.43.2","Node name for S&R":"BasicScheduler","ue_properties":{"widget_ue_connectable":{},"input_ue_unconnectable":{},"version":"7.8"}},"widgets_values":["beta",4,0.2],"widgets_values_named":{"scheduler":"beta","steps":4,"denoise":0.2}},{"id":165,"type":"MiniMaxH3DirectorRefine","pos":[113.26910329503947,2815.291144572315],"size":[470,626],"flags":{},"order":11,"mode":0,"inputs":[{"localized_name":"refine_model","name":"refine_model","shape":7,"type":"MODEL","link":12},{"localized_name":"sigmas","name":"sigmas","shape":7,"type":"SIGMAS","link":5},{"localized_name":"upscale_model","name":"upscale_model","shape":7,"type":"UPSCALE_MODEL","link":null},{"localized_name":"mode","name":"mode","type":"COMBO","widget":{"name":"mode"},"link":null},{"localized_name":"upscale_method","name":"upscale_method","type":"COMBO","widget":{"name":"upscale_method"},"link":null},{"localized_name":"latent_upscale_model","name":"latent_upscale_model","type":"COMBO","widget":{"name":"latent_upscale_model"},"link":null},{"localized_name":"sampler","name":"sampler","type":"COMBO","widget":{"name":"sampler"},"link":null},{"localized_name":"passes","name":"passes","type":"INT","widget":{"name":"passes"},"link":null},{"localized_name":"seed_mode","name":"seed_mode","shape":7,"type":"COMBO","widget":{"name":"seed_mode"},"link":null},{"localized_name":"aspect_ratio","name":"aspect_ratio","shape":7,"type":"COMBO","widget":{"name":"aspect_ratio"},"link":null},{"localized_name":"megapixels","name":"megapixels","shape":7,"type":"FLOAT","widget":{"name":"megapixels"},"link":null},{"localized_name":"width","name":"width","shape":7,"type":"INT","widget":{"name":"width"},"link":null},{"localized_name":"height","name":"height","shape":7,"type":"INT","widget":{"name":"height"},"link":null},{"localized_name":"skip_fl2v","name":"skip_fl2v","shape":7,"type":"BOOLEAN","widget":{"name":"skip_fl2v"},"link":null},{"localized_name":"confirm_first_pass","name":"confirm_first_pass","shape":7,"type":"BOOLEAN","widget":{"name":"confirm_first_pass"},"link":null},{"localized_name":"enable_latent_chunking","name":"enable_latent_chunking","shape":7,"type":"BOOLEAN","widget":{"name":"enable_latent_chunking"},"link":null},{"localized_name":"enable_tiling","name":"enable_tiling","shape":7,"type":"BOOLEAN","widget":{"name":"enable_tiling"},"link":null},{"localized_name":"tile_count","name":"tile_count","shape":7,"type":"INT","widget":{"name":"tile_count"},"link":null},{"localized_name":"tile_overlap","name":"tile_overlap","shape":7,"type":"INT","widget":{"name":"tile_overlap"},"link":null},{"localized_name":"seed","name":"seed","shape":7,"type":"INT","widget":{"name":"seed"},"link":null}],"outputs":[{"localized_name":"refine","name":"refine","type":"MMX_DIR_REFINE","links":[7]},{"localized_name":"width","name":"width","type":"INT","links":[]},{"localized_name":"height","name":"height","type":"INT","links":[]}],"title":"165 · 放大与二采","properties":{"cnr_id":"minimax-h3-director","ver":"4c6245e518dd8a494f3afc4f3cccd53f22d82d10","Node name for S&R":"MiniMaxH3DirectorRefine","ue_properties":{"widget_ue_connectable":{},"input_ue_unconnectable":{},"version":"7.8"}},"widgets_values":["upscale","h3_latent","minimax_h3_latent_upscaler_3d_conv_v1_fp32.pth","euler",1,"independent",933813825925975,"fixed","跟随导演台",2,1088,736,true,false,true,true,2,128],"widgets_values_named":{"mode":"upscale","upscale_method":"h3_latent","latent_upscale_model":"minimax_h3_latent_upscaler_3d_conv_v1_fp32.pth","sampler":"euler","passes":1,"seed_mode":"independent","seed":933813825925975,"control_after_generate":"fixed","aspect_ratio":"跟随导演台","megapixels":2,"width":1088,"height":736,"skip_fl2v":true,"confirm_first_pass":false,"enable_latent_chunking":true,"enable_tiling":true,"tile_count":2,"tile_overlap":128}},{"id":167,"type":"LoraLoaderModelOnly","pos":[-187.12387702726278,3236.323220502314],"size":[270,82],"flags":{},"order":7,"mode":0,"inputs":[{"localized_name":"模型","name":"model","type":"MODEL","link":13},{"localized_name":"LoRA名称","name":"lora_name","type":"COMBO","widget":{"name":"lora_name"},"link":null},{"localized_name":"模型强度","name":"strength_model","type":"FLOAT","widget":{"name":"strength_model"},"link":null}],"outputs":[{"localized_name":"模型","name":"MODEL","type":"MODEL","links":[10]}],"properties":{"cnr_id":"comfy-core","ver":"0.44.0","Node name for S&R":"LoraLoaderModelOnly"},"widgets_values":["minimax\\h3_character_swap_v1.5.safetensors",1],"widgets_values_named":{"lora_name":"minimax\\h3_character_swap_v1.5.safetensors","strength_model":1}},{"id":168,"type":"LoraLoaderModelOnly","pos":[-181.0333191420507,3076.900693741181],"size":[270,82],"flags":{},"order":9,"mode":0,"inputs":[{"localized_name":"模型","name":"model","type":"MODEL","link":9},{"localized_name":"LoRA名称","name":"lora_name","type":"COMBO","widget":{"name":"lora_name"},"link":null},{"localized_name":"模型强度","name":"strength_model","type":"FLOAT","widget":{"name":"strength_model"},"link":null}],"outputs":[{"localized_name":"模型","name":"MODEL","type":"MODEL","links":[11,12]}],"properties":{"cnr_id":"comfy-core","ver":"0.44.0","Node name for S&R":"LoraLoaderModelOnly"},"widgets_values":["minimax\\minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",0.75],"widgets_values_named":{"lora_name":"minimax\\minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors","strength_model":0.75}},{"id":169,"type":"MiniMaxH3MemoryEfficientSageAttentionPatch","pos":[-538.8023627594422,3099.5921205659115],"size":[320.323828125,26],"flags":{},"order":8,"mode":0,"inputs":[{"localized_name":"model","name":"model","type":"MODEL","link":10}],"outputs":[{"localized_name":"model","name":"model","type":"MODEL","links":[9]}],"properties":{"cnr_id":"comfyui-kjnodes","ver":"1.5.3","Node name for S&R":"MiniMaxH3MemoryEfficientSageAttentionPatch"}},{"id":170,"type":"MiniMaxH3HybridLoader","pos":[-514.0899715222153,3343.6967355141924],"size":[303.171875,250],"flags":{},"order":5,"mode":0,"inputs":[{"localized_name":"base_model","name":"base_model","type":"COMBO","widget":{"name":"base_model"},"link":null},{"localized_name":"overlay_model","name":"overlay_model","type":"COMBO","widget":{"name":"overlay_model"},"link":null},{"localized_name":"overlay_preset","name":"overlay_preset","type":"COMBO","widget":{"name":"overlay_preset"},"link":null},{"localized_name":"block_range_start","name":"block_range_start","shape":7,"type":"INT","widget":{"name":"block_range_start"},"link":null},{"localized_name":"block_range_end","name":"block_range_end","shape":7,"type":"INT","widget":{"name":"block_range_end"},"link":null},{"localized_name":"final_adaln_from_overlay","name":"final_adaln_from_overlay","shape":7,"type":"BOOLEAN","widget":{"name":"final_adaln_from_overlay"},"link":null},{"localized_name":"custom_overlays","name":"custom_overlays","shape":7,"type":"STRING","widget":{"name":"custom_overlays"},"link":null},{"localized_name":"custom_base","name":"custom_base","shape":7,"type":"STRING","widget":{"name":"custom_base"},"link":null},{"localized_name":"weight_dtype","name":"weight_dtype","shape":7,"type":"COMBO","widget":{"name":"weight_dtype"},"link":null}],"outputs":[{"localized_name":"model","name":"model","type":"MODEL","links":[13]}],"properties":{"aux_id":"scottmudge/ComfyUI_MinimaxH3HybridLoader","ver":"a44c69b02242e41fbd01e22abe2a492adc853038","Node name for S&R":"MiniMaxH3HybridLoader","ue_properties":{"widget_ue_connectable":{},"input_ue_unconnectable":{},"version":"7.8"}},"widgets_values":["minimax\\minimax_h3_fl2va_pruned_fp8_scaled.safetensors","minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors","block_range_adaln",25,49,false,"","","default"],"widgets_values_named":{"base_model":"minimax\\minimax_h3_fl2va_pruned_fp8_scaled.safetensors","overlay_model":"minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors","overlay_preset":"block_range_adaln","block_range_start":25,"block_range_end":49,"final_adaln_from_overlay":false,"custom_overlays":"","custom_base":"","weight_dtype":"default"}},{"id":171,"type":"CapCutRelayVSRWorkflow","pos":[-501.5678510097675,2236.6907126640085],"size":[540,130],"flags":{},"order":6,"mode":0,"inputs":[{"localized_name":"主模型","name":"unet_name","type":"COMBO","widget":{"name":"unet_name"},"link":null},{"localized_name":"VAE","name":"vae_name","type":"COMBO","widget":{"name":"vae_name"},"link":null},{"localized_name":"细节","name":"detail","type":"FLOAT","widget":{"name":"detail"},"link":null}],"outputs":[{"localized_name":"工作流","name":"工作流","type":"CAPCUT_WORKFLOW","links":[14]}],"properties":{"Node name for S&R":"CapCutRelayVSRWorkflow"},"widgets_values":["RelayVSR\\relayvsr_x4_int8_convrot.safetensors","RelayVSR\\relayvsr_flash_vae_x4_fp32.safetensors",0.8],"widgets_values_named":{"unet_name":"RelayVSR\\relayvsr_x4_int8_convrot.safetensors","vae_name":"RelayVSR\\relayvsr_flash_vae_x4_fp32.safetensors","detail":0.8}}],"links":[[5,163,0,165,1,"SIGMAS"],[9,169,0,168,0,"MODEL"],[10,167,0,169,0,"MODEL"],[11,168,0,163,0,"MODEL"],[12,168,0,165,0,"MODEL"],[13,170,0,167,0,"MODEL"],[1,2,0,1,0,"CAPCUT_WORKFLOW"],[2,3,0,1,1,"CAPCUT_WORKFLOW"],[3,4,0,1,2,"CAPCUT_WORKFLOW"],[4,5,0,1,3,"CAPCUT_WORKFLOW"],[14,171,0,1,4,"CAPCUT_WORKFLOW"],[6,158,0,1,7,"MMX_DIR_SELFLIFT"],[7,165,0,1,8,"MMX_DIR_REFINE"]],"groups":[{"id":1,"title":"二采","bounding":[-563.1512825278404,2666.6051442029625,1176.031418328533,1066.3552952816585],"color":"#3f789e","flags":{}}],"config":{},"extra":{"ds":{"scale":0.3140495867768604,"offset":[-347.9247099857773,744.0243058473999]},"frontendVersion":"1.57.6","VHS_latentpreview":false,"VHS_latentpreviewrate":0,"VHS_MetadataImage":true,"VHS_KeepIntermediate":true},"extensions":{"seed_widgets":{}},"version":0.4}
+{
+  "id": "96b80845-0927-4410-b8ba-e331da67938b",
+  "revision": 0,
+  "last_node_id": 171,
+  "last_link_id": 14,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "CapCutMainConsole",
+      "pos": [
+        2404.629107987252,
+        50.63514011985396
+      ],
+      "size": [
+        350,
+        843.5833333333334
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "workflows.workflow_0",
+          "shape": 7,
+          "type": "CAPCUT_WORKFLOW",
+          "link": 1
+        },
+        {
+          "name": "workflows.workflow_1",
+          "shape": 7,
+          "type": "CAPCUT_WORKFLOW",
+          "link": 2
+        },
+        {
+          "name": "workflows.workflow_2",
+          "shape": 7,
+          "type": "CAPCUT_WORKFLOW",
+          "link": 3
+        },
+        {
+          "name": "workflows.workflow_3",
+          "shape": 7,
+          "type": "CAPCUT_WORKFLOW",
+          "link": 4
+        },
+        {
+          "name": "workflows.workflow_4",
+          "shape": 7,
+          "type": "CAPCUT_WORKFLOW",
+          "link": 14
+        },
+        {
+          "name": "workflows.workflow_5",
+          "shape": 7,
+          "type": "CAPCUT_WORKFLOW",
+          "link": null
+        },
+        {
+          "name": "workflows.workflow_6",
+          "shape": 7,
+          "type": "CAPCUT_WORKFLOW",
+          "link": null
+        },
+        {
+          "name": "selflift",
+          "shape": 7,
+          "type": "MMX_DIR_SELFLIFT",
+          "link": 6
+        },
+        {
+          "name": "refine",
+          "shape": 7,
+          "type": "MMX_DIR_REFINE",
+          "link": 7
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "CapCutMainConsole",
+        "capcut_project_id": "b1d5dd25f94c46f0b14ddd5e634aee1c"
+      },
+      "widgets_values": [
+        "未命名工程",
+        null
+      ],
+      "widgets_values_named": {
+        "project_name": "未命名工程",
+        "打开剪辑工作台": null
+      },
+      "color": "#183a39",
+      "bgcolor": "#19282b"
+    },
+    {
+      "id": 2,
+      "type": "CapCutMiniMaxH3Workflow",
+      "pos": [
+        -580,
+        50
+      ],
+      "size": [
+        540,
+        360
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "工作流",
+          "type": "CAPCUT_WORKFLOW",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CapCutMiniMaxH3Workflow"
+      },
+      "widgets_values": [
+        "minimax\\minimax_h3_fl2va_pruned_fp8_scaled.safetensors",
+        "minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+        "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "minimax\\minimax_h3_video_vae_fp16.safetensors",
+        "minimax\\minimax_h3_audio_vae_fp32.safetensors",
+        "minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",
+        1,
+        8,
+        12,
+        3
+      ],
+      "widgets_values_named": {
+        "base_model": "minimax\\minimax_h3_fl2va_pruned_fp8_scaled.safetensors",
+        "overlay_model": "minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+        "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "video_vae": "minimax\\minimax_h3_video_vae_fp16.safetensors",
+        "audio_vae": "minimax\\minimax_h3_audio_vae_fp32.safetensors",
+        "lora_name": "minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",
+        "lora_strength": 1,
+        "steps": 8,
+        "shift_video": 12,
+        "shift_audio": 3
+      },
+      "color": "#183a39",
+      "bgcolor": "#19282b"
+    },
+    {
+      "id": 3,
+      "type": "CapCutMiniMaxH3CharacterSwapWorkflow",
+      "pos": [
+        -580,
+        480
+      ],
+      "size": [
+        620,
+        634
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "工作流",
+          "type": "CAPCUT_WORKFLOW",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CapCutMiniMaxH3CharacterSwapWorkflow"
+      },
+      "widgets_values": [
+        "minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+        "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "minimax\\minimax_h3_video_vae_fp16.safetensors",
+        "minimax\\minimax_h3_audio_vae_fp32.safetensors",
+        "sam3.1_multiplex_fp16.safetensors",
+        "minimax\\h3_character_swap_v1.5.safetensors",
+        1,
+        "minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",
+        1,
+        8,
+        12,
+        3,
+        "comfy kitchen attention",
+        0.5,
+        1,
+        1,
+        "",
+        0.3,
+        12,
+        4,
+        16,
+        1.75,
+        36,
+        1,
+        16
+      ],
+      "widgets_values_named": {
+        "model_name": "minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+        "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "video_vae": "minimax\\minimax_h3_video_vae_fp16.safetensors",
+        "audio_vae": "minimax\\minimax_h3_audio_vae_fp32.safetensors",
+        "sam_checkpoint": "sam3.1_multiplex_fp16.safetensors",
+        "character_lora": "minimax\\h3_character_swap_v1.5.safetensors",
+        "character_strength": 1,
+        "turbo_lora": "minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",
+        "turbo_strength": 1,
+        "steps": 8,
+        "shift_video": 12,
+        "shift_audio": 3,
+        "attention": "comfy kitchen attention",
+        "detection_threshold": 0.5,
+        "max_objects": 1,
+        "detect_interval": 1,
+        "object_indices": "",
+        "cleanup_threshold": 0.3,
+        "cleanup_shrink": 12,
+        "cleanup_min_frames": 4,
+        "edge_grow": 16,
+        "crop_scale": 1.75,
+        "grow_spatial": 36,
+        "grow_temporal": 1,
+        "feather": 16
+      },
+      "color": "#283e57",
+      "bgcolor": "#1c2838"
+    },
+    {
+      "id": 4,
+      "type": "CapCutBodyRenderWorkflow",
+      "pos": [
+        -580,
+        1190
+      ],
+      "size": [
+        620,
+        410
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "工作流",
+          "type": "CAPCUT_WORKFLOW",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CapCutBodyRenderWorkflow"
+      },
+      "widgets_values": [
+        "sam3.1_multiplex_fp16.safetensors",
+        "rt_detr_v4-x-hgnet_fp16.safetensors",
+        "moge_2_vitl_normal_fp16.safetensors",
+        "sam_3d_body_dinov3_bf16.safetensors",
+        16,
+        0.5,
+        0.5,
+        1,
+        64,
+        4,
+        true,
+        9,
+        0.95,
+        768
+      ],
+      "widgets_values_named": {
+        "sam_checkpoint": "sam3.1_multiplex_fp16.safetensors",
+        "detector_model": "rt_detr_v4-x-hgnet_fp16.safetensors",
+        "moge_model": "moge_2_vitl_normal_fp16.safetensors",
+        "body_model": "sam_3d_body_dinov3_bf16.safetensors",
+        "max_people": 16,
+        "detection_threshold": 0.5,
+        "detector_threshold": 0.5,
+        "detect_interval": 1,
+        "body_batch_size": 64,
+        "moge_batch_size": 4,
+        "hand_refinement": true,
+        "smoothing_window": 9,
+        "rmbg_sensitivity": 0.95,
+        "rmbg_resolution": 768
+      },
+      "color": "#3d3454",
+      "bgcolor": "#282437"
+    },
+    {
+      "id": 5,
+      "type": "CapCutMotionTransferWorkflow",
+      "pos": [
+        -580,
+        1680
+      ],
+      "size": [
+        620,
+        470
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "工作流",
+          "type": "CAPCUT_WORKFLOW",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "title": "CapCut MiniMax H3 动作迁移（含显存清理）",
+      "properties": {
+        "Node name for S&R": "CapCutMotionTransferWorkflow"
+      },
+      "widgets_values": [
+        "minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+        "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "minimax\\minimax_h3_video_vae_fp16.safetensors",
+        "minimax\\minimax_h3_audio_vae_fp32.safetensors",
+        "minimax\\Motion_Repair_V2.safetensors",
+        0.35,
+        "minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",
+        1,
+        8,
+        12,
+        3,
+        "comfy kitchen attention",
+        true,
+        1.1,
+        1536,
+        "taeh3.safetensors"
+      ],
+      "widgets_values_named": {
+        "model_name": "minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+        "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "video_vae": "minimax\\minimax_h3_video_vae_fp16.safetensors",
+        "audio_vae": "minimax\\minimax_h3_audio_vae_fp32.safetensors",
+        "motion_lora": "minimax\\Motion_Repair_V2.safetensors",
+        "motion_strength": 0.35,
+        "turbo_lora": "minimax\\minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",
+        "turbo_strength": 1,
+        "steps": 8,
+        "shift_video": 12,
+        "shift_audio": 3,
+        "attention": "comfy kitchen attention",
+        "sparse_attention": true,
+        "sparse_threshold": 1.1,
+        "reference_longest_side": 1536,
+        "tiny_vae": "taeh3.safetensors"
+      },
+      "color": "#3e4630",
+      "bgcolor": "#293023"
+    },
+    {
+      "id": 158,
+      "type": "MiniMaxH3DirectorSelfLift",
+      "pos": [
+        -518.3324980244568,
+        -736.6958725243021
+      ],
+      "size": [
+        440,
+        680
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model_hires",
+          "shape": 7,
+          "type": "MODEL",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "selflift",
+          "type": "MMX_DIR_SELFLIFT",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "title": "158 · SelfLift 渐进采样",
+      "properties": {
+        "cnr_id": "minimax-h3-director",
+        "ver": "4c6245e518dd8a494f3afc4f3cccd53f22d82d10",
+        "Node name for S&R": "MiniMaxH3DirectorSelfLift",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "渐进采样",
+        "highres_steps",
+        2,
+        6,
+        0.5,
+        "euler",
+        true,
+        "提升 / 3D",
+        "minimax_h3_latent_upscaler_3d_conv_v1_fp32.pth",
+        "bilinear",
+        0,
+        0.5,
+        1,
+        false,
+        "高清分块",
+        false,
+        2,
+        128
+      ],
+      "widgets_values_named": {
+        "bd_grp_selflift_sample": "渐进采样",
+        "split_mode": "highres_steps",
+        "highres_steps": 2,
+        "transition_step": 6,
+        "lowres_scale": 0.5,
+        "sampler_mode": "euler",
+        "native_low_carry": true,
+        "bd_grp_selflift_lift": "提升 / 3D",
+        "latent_upscale_model": "minimax_h3_latent_upscaler_3d_conv_v1_fp32.pth",
+        "latent_upsample": "bilinear",
+        "rho": 0,
+        "w_min": 0.5,
+        "w_max": 1,
+        "enable_latent_chunking": false,
+        "bd_grp_selflift_tile": "高清分块",
+        "enable_tiling": false,
+        "tile_count": 2,
+        "tile_overlap": 128
+      }
+    },
+    {
+      "id": 163,
+      "type": "BasicScheduler",
+      "pos": [
+        -402.80281233388575,
+        2809.9074720555855
+      ],
+      "size": [
+        440,
+        170
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "title": "163 · 二采调度器（待接模型）",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.43.2",
+        "Node name for S&R": "BasicScheduler",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "beta",
+        4,
+        0.2
+      ],
+      "widgets_values_named": {
+        "scheduler": "beta",
+        "steps": 4,
+        "denoise": 0.2
+      }
+    },
+    {
+      "id": 165,
+      "type": "MiniMaxH3DirectorRefine",
+      "pos": [
+        113.26910329503947,
+        2815.291144572315
+      ],
+      "size": [
+        470,
+        626
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "refine_model",
+          "shape": 7,
+          "type": "MODEL",
+          "link": 12
+        },
+        {
+          "name": "sigmas",
+          "shape": 7,
+          "type": "SIGMAS",
+          "link": 5
+        },
+        {
+          "name": "upscale_model",
+          "shape": 7,
+          "type": "UPSCALE_MODEL",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "refine",
+          "type": "MMX_DIR_REFINE",
+          "links": [
+            7
+          ]
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "links": []
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": []
+        }
+      ],
+      "title": "165 · 放大与二采",
+      "properties": {
+        "cnr_id": "minimax-h3-director",
+        "ver": "4c6245e518dd8a494f3afc4f3cccd53f22d82d10",
+        "Node name for S&R": "MiniMaxH3DirectorRefine",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "upscale",
+        "h3_latent",
+        "minimax_h3_latent_upscaler_3d_conv_v1_fp32.pth",
+        "euler",
+        1,
+        "independent",
+        933813825925975,
+        "fixed",
+        "跟随导演台",
+        2,
+        1088,
+        736,
+        true,
+        false,
+        true,
+        true,
+        2,
+        128
+      ],
+      "widgets_values_named": {
+        "mode": "upscale",
+        "upscale_method": "h3_latent",
+        "latent_upscale_model": "minimax_h3_latent_upscaler_3d_conv_v1_fp32.pth",
+        "sampler": "euler",
+        "passes": 1,
+        "seed_mode": "independent",
+        "seed": 933813825925975,
+        "control_after_generate": "fixed",
+        "aspect_ratio": "跟随导演台",
+        "megapixels": 2,
+        "width": 1088,
+        "height": 736,
+        "skip_fl2v": true,
+        "confirm_first_pass": false,
+        "enable_latent_chunking": true,
+        "enable_tiling": true,
+        "tile_count": 2,
+        "tile_overlap": 128
+      }
+    },
+    {
+      "id": 167,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        -187.12387702726278,
+        3236.323220502314
+      ],
+      "size": [
+        270,
+        82
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            10
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.44.0",
+        "Node name for S&R": "LoraLoaderModelOnly"
+      },
+      "widgets_values": [
+        "minimax\\h3_character_swap_v1.5.safetensors",
+        1
+      ],
+      "widgets_values_named": {
+        "lora_name": "minimax\\h3_character_swap_v1.5.safetensors",
+        "strength_model": 1
+      }
+    },
+    {
+      "id": 168,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        -181.0333191420507,
+        3076.900693741181
+      ],
+      "size": [
+        270,
+        82
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            11,
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.44.0",
+        "Node name for S&R": "LoraLoaderModelOnly"
+      },
+      "widgets_values": [
+        "minimax\\minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",
+        0.75
+      ],
+      "widgets_values_named": {
+        "lora_name": "minimax\\minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",
+        "strength_model": 0.75
+      }
+    },
+    {
+      "id": 169,
+      "type": "MiniMaxH3MemoryEfficientSageAttentionPatch",
+      "pos": [
+        -538.8023627594422,
+        3099.5921205659115
+      ],
+      "size": [
+        320.323828125,
+        26
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-kjnodes",
+        "ver": "1.5.3",
+        "Node name for S&R": "MiniMaxH3MemoryEfficientSageAttentionPatch"
+      }
+    },
+    {
+      "id": 170,
+      "type": "MiniMaxH3HybridLoader",
+      "pos": [
+        -514.0899715222153,
+        3343.6967355141924
+      ],
+      "size": [
+        303.171875,
+        250
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "scottmudge/ComfyUI_MinimaxH3HybridLoader",
+        "ver": "a44c69b02242e41fbd01e22abe2a492adc853038",
+        "Node name for S&R": "MiniMaxH3HybridLoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "minimax\\minimax_h3_fl2va_pruned_fp8_scaled.safetensors",
+        "minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+        "block_range_adaln",
+        25,
+        49,
+        false,
+        "",
+        "",
+        "default"
+      ],
+      "widgets_values_named": {
+        "base_model": "minimax\\minimax_h3_fl2va_pruned_fp8_scaled.safetensors",
+        "overlay_model": "minimax\\minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+        "overlay_preset": "block_range_adaln",
+        "block_range_start": 25,
+        "block_range_end": 49,
+        "final_adaln_from_overlay": false,
+        "custom_overlays": "",
+        "custom_base": "",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 171,
+      "type": "CapCutRelayVSRWorkflow",
+      "pos": [
+        -501.5678510097675,
+        2236.6907126640085
+      ],
+      "size": [
+        540,
+        130
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "工作流",
+          "type": "CAPCUT_WORKFLOW",
+          "links": [
+            14
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CapCutRelayVSRWorkflow"
+      },
+      "widgets_values": [
+        "RelayVSR\\relayvsr_x4_int8_convrot.safetensors",
+        "RelayVSR\\relayvsr_flash_vae_x4_fp32.safetensors",
+        0.8
+      ],
+      "widgets_values_named": {
+        "unet_name": "RelayVSR\\relayvsr_x4_int8_convrot.safetensors",
+        "vae_name": "RelayVSR\\relayvsr_flash_vae_x4_fp32.safetensors",
+        "detail": 0.8
+      }
+    }
+  ],
+  "links": [
+    [
+      5,
+      163,
+      0,
+      165,
+      1,
+      "SIGMAS"
+    ],
+    [
+      9,
+      169,
+      0,
+      168,
+      0,
+      "MODEL"
+    ],
+    [
+      10,
+      167,
+      0,
+      169,
+      0,
+      "MODEL"
+    ],
+    [
+      11,
+      168,
+      0,
+      163,
+      0,
+      "MODEL"
+    ],
+    [
+      12,
+      168,
+      0,
+      165,
+      0,
+      "MODEL"
+    ],
+    [
+      13,
+      170,
+      0,
+      167,
+      0,
+      "MODEL"
+    ],
+    [
+      1,
+      2,
+      0,
+      1,
+      0,
+      "CAPCUT_WORKFLOW"
+    ],
+    [
+      2,
+      3,
+      0,
+      1,
+      1,
+      "CAPCUT_WORKFLOW"
+    ],
+    [
+      3,
+      4,
+      0,
+      1,
+      2,
+      "CAPCUT_WORKFLOW"
+    ],
+    [
+      4,
+      5,
+      0,
+      1,
+      3,
+      "CAPCUT_WORKFLOW"
+    ],
+    [
+      14,
+      171,
+      0,
+      1,
+      4,
+      "CAPCUT_WORKFLOW"
+    ],
+    [
+      6,
+      158,
+      0,
+      1,
+      7,
+      "MMX_DIR_SELFLIFT"
+    ],
+    [
+      7,
+      165,
+      0,
+      1,
+      8,
+      "MMX_DIR_REFINE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "二采",
+      "bounding": [
+        -563.1512825278404,
+        2666.6051442029625,
+        1176.031418328533,
+        1066.3552952816585
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.3140495867768604,
+      "offset": [
+        -347.9247099857773,
+        744.0243058473999
+      ]
+    },
+    "frontendVersion": "1.59.6",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "extensions": {
+    "seed_widgets": {}
+  },
+  "version": 0.4,
+  "seed_widgets": {
+    "165": 6
+  }
+}

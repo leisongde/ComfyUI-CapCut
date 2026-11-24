@@ -1,6 +1,6 @@
 # ComfyUI-CapCut · 主控台预览版
 
-GitHub 发布版：**V0.1.3**。
+GitHub 发布版：**V0.1.4**。
 
 ## 界面预览
 

@@ -127,9 +127,15 @@ def concatenate_shots(files):
     filter_script = destination.with_suffix('.ffmpeg-filters')
     try:
         filter_script.write_text(';'.join(filters), encoding='ascii')
-        run_ffmpeg([*args, '-filter_complex_script', str(filter_script), '-map', '[v]', '-map', '[a]',
-                    '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-threads', '4',
-                    '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', str(temporary)], 1800)
+        command = [str(filter_script), *args, '-map', '[v]', '-map', '[a]',
+                   '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-threads', '4',
+                   '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', str(temporary)]
+        try:
+            run_ffmpeg(['-/filter_complex', *command], 1800)
+        except ValueError as error:
+            if "Unrecognized option '/filter_complex'" not in str(error):
+                raise
+            run_ffmpeg(['-filter_complex_script', *command], 1800)
         temporary.rename(destination)
     finally:
         temporary.unlink(missing_ok=True)
