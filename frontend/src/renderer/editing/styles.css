@@ -5639,6 +5639,19 @@ progress {
 
 .ai-tracks-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; background: #101b17; color: #c1d8cb; }
 .ai-tracks-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 35px; padding: 0 12px; background: #193326; border-bottom: 1px solid #314a3b; }
+.ai-tracks-header > div:last-child { flex-wrap: wrap; justify-content: flex-end; gap: 4px 8px; padding: 4px 0; }
+.ai-tracks-header > div:first-child { white-space: nowrap; }
+.ai-guide-toggle { width: 17px; height: 10px; border-radius: 8px; background: #537564; position: relative; }
+.ai-guide-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 6px; height: 6px; border-radius: 50%; background: #eefaf1; }
+[aria-checked="true"] > .ai-guide-toggle { background: #42975f; }
+[aria-checked="true"] > .ai-guide-toggle::after { left: 9px; }
+.ai-output-mode { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: #a7c9b2; white-space: nowrap; }
+.ai-output-mode select { height: 24px; padding: 0 5px; border: 1px solid #416a4f; border-radius: 4px; background: #1e3d2b; color: #c4edcf; font-size: 11px; }
+.ai-shot-seam { position: absolute; top: 1px; z-index: 3; display: flex; align-items: center; transform: translateX(-50%); border: 1px solid #759784; border-radius: 4px; height: 16px; line-height: 12px; font-size: 9px; white-space: nowrap; background: #263d31; color: #d5e8db; }
+.ai-shot-seam[data-linked="true"] { border-color: #9fe7b4; background: #2c6041; color: #eefbf2; }
+.ai-shot-seam button { height: 100%; padding: 0 4px; cursor: pointer; }
+.ai-shot-seam select { height: 14px; padding: 0 1px; border: 0; border-left: 1px solid #759784; background: #263d31; color: #eefbf2; font-size: 9px; }
+.ai-shot-seam button:disabled, .ai-shot-seam select:disabled { cursor: not-allowed; opacity: .75; }
 .ai-tracks-header > div { display: flex; align-items: center; gap: 9px; }
 .ai-tracks-header strong { font-size: 12px; color: #a7e2be; }
 .ai-tracks-header span, .ai-tracks-footer { font-size: 10px; color: #789b86; }
@@ -5732,6 +5745,18 @@ progress {
 .prompt-mention-option small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-foreground); font-size: 10px; }
 .image-to-video-input { display: grid; gap: 8px; font-size: 12px; }
 .text-to-video-form .media-upload { position: relative; min-height: 120px; padding: 12px; border-style: dashed; flex-direction: column; color: var(--muted-foreground); }
+.text-to-video-form .media-library-trigger { min-height: 32px; padding: 5px 8px; }
+.media-library-trigger:hover:not(:disabled), .media-library-list button:hover:not(:disabled) { background: var(--accent); }
+.media-library-dialog { max-height: 80vh; grid-template-rows: auto auto minmax(0, 1fr); z-index: 1101; overflow: hidden; }
+.media-library-dialog > div:first-child { padding-bottom: 12px; padding-right: 56px; }
+.media-library-search { min-width: 0; margin: 0 16px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 5px; background: var(--background); color: var(--foreground); font-size: 12px; }
+.media-library-list { grid-row: 3; display: grid; gap: 4px; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px 16px; }
+.media-library-list button { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px; text-align: left; font-size: 12px; }
+.media-library-list button[aria-pressed="true"] { border-color: #76bc8e; }
+.media-library-thumb { display: grid; place-items: center; flex: 0 0 48px; height: 36px; overflow: hidden; border-radius: 4px; background: var(--background); color: var(--muted-foreground); }
+.media-library-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.media-library-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-library-list p { padding: 8px 0; color: var(--muted-foreground); font-size: 12px; }
 .media-upload img { max-height: 160px; max-width: 100%; object-fit: contain; border-radius: 4px; }
 .text-to-video-form .media-upload.drag-over { border-color: #76bc8e; background: #23432d; color: #c4edcf; }
 .media-upload-drop-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border-radius: inherit; background: rgb(35 67 45 / .9); pointer-events: none; }

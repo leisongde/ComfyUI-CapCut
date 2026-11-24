@@ -27,6 +27,8 @@ async function setup(draftValues = values, options = {}) {
             if (operation === 'capcut:minimax-key:get') return { key: options.key ?? 'session-only-key' };
             if (operation === 'capcut:motion-transfer-key:get') return { key: options.motionKey ?? '' };
             if (operation === 'capcut:run-workflow') { report = progress; submitted(); return options.onRun ? options.onRun(payload) : result; }
+            if (operation === 'capcut:concat-ai-shots') return options.onConcat(payload);
+            if (operation === 'capcut:shot-guide-file') return options.onResolveGuide(payload);
             assert.equal(operation, 'capcut:import-result');
             if (options.onImport) await options.onImport(payload);
             return { name: 'result.mp4', bytes: new Uint8Array([1]), mimeType: 'video/mp4' };
@@ -35,7 +37,7 @@ async function setup(draftValues = values, options = {}) {
         '@/lib/media/processing': { processMediaAssets: async () => [{ type: 'video', name: 'result.mp4', duration: 5.8 }] },
         '@/constants/text-constants': { DEFAULT_TEXT_ELEMENT: {} },
         '@/constants/timeline-constants': { TIMELINE_CONSTANTS: { DEFAULT_ELEMENT_DURATION: 5 }, TRACK_COLORS: {}, TRACK_HEIGHTS: {}, TRACK_GAP: 4 },
-        sonner: { toast: { success() {} } },
+        sonner: { toast: { success() {}, warning: (...args) => options.onWarning?.(...args) } },
         mediabunny: { ALL_FORMATS: [], BlobSource: class {}, Input: class { async getPrimaryAudioTrack() { return options.hasAudio ?? true; } dispose() {} } },
     };
     const modules = new Map();
@@ -1133,4 +1135,151 @@ test('switching projects or removing the AI draft cannot insert the old result',
         assert.equal(env.assets.length, 0);
         assert.equal(env.calls.length, 1);
     }
+});
+
+test('all output exports one timeline clip in queue order and feeds the actual adjacent result to the next shot', async () => {
+    const first = { filename: 'first.mp4', subfolder: 'MiniMaxH3', type: 'output' };
+    const second = { ...first, filename: 'second.mp4' };
+    const merged = { ...first, filename: 'merged.mp4' };
+    let calls = 0, env;
+    env = await setup({ ...values, task_type: 'T2VA', prompt: 'first' }, {
+        onRun: ({ values: fields }) => {
+            if (++calls === 1) {
+                assert.equal(fields.continuity_video, undefined);
+                return [first];
+            }
+            assert.equal(fields.prompt, 'second');
+            assert.deepEqual(fields.continuity_video, first);
+            assert.equal(fields.continuity_frames, 39);
+            assert.equal(env.editor.timeline.getTracks().flatMap(track => track.elements).length, 1);
+            return [second];
+        },
+        onConcat: ({ files }) => {
+            assert.deepEqual(Array.from(files), [first, second]);
+            return merged;
+        },
+    });
+    const next = env.api.saveTextToVideoDraft(env.planning(), { startTime: 7.17, trackIndex: 1 }, { ...values, task_type: 'T2VA', prompt: 'second' });
+    env.setPlanning({ ...next, aiTrackGuideEnabled: true, aiTrackOutputMode: 'all', scenes: next.scenes.map(scene => ({ ...scene,
+        shots: scene.shots.map(shot => shot.id === next.selectedShotId ? { ...shot, aiTrackGuideFrames: 39 } : shot),
+    })) });
+    const result = await env.api.generateAIShots(env.editor, [next.selectedShotId, env.shotId]);
+    assert.equal(result.completed, 2);
+    assert.equal(result.outputMode, 'all');
+    assert.equal(result.merged, 1);
+    assert.equal(env.assets.length, 3);
+    const clips = env.editor.timeline.getTracks().flatMap(track => track.elements);
+    assert.equal(clips.length, 1);
+    assert.equal(clips[0].name, 'AI 镜头 · 全部导出');
+    assert.equal(clips[0].startTime, 2);
+    assert.equal(clips[0].directorGeneration, undefined);
+    assert.ok(env.planning().scenes.every(scene => scene.shots[0].outputVersions.length === 1));
+});
+
+test('only the immediately adjacent same-track shot can use saved continuity, and hard cut skips it', async () => {
+    const video = { filename: 'saved.mp4', subfolder: 'CapCut/default/project', type: 'input' };
+    const seen = [], frames = [];
+    const env = await setup({ ...values, task_type: 'T2VA' }, {
+        onRun: ({ values: fields }) => { seen.push(fields.continuity_video); frames.push(fields.continuity_frames); return [{ filename: 'out.mp4' }]; },
+        onResolveGuide: ({ assetId }) => { assert.equal(assetId, 'generated-asset'); return video; },
+    });
+    await env.api.generateAIShots(env.editor, [env.shotId]);
+    const next = env.api.saveTextToVideoDraft(env.planning(), { startTime: 7.17, trackIndex: 1 }, { ...values, task_type: 'T2VA', prompt: 'second' });
+    const other = env.api.saveTextToVideoDraft(next, { startTime: 7.17, trackIndex: 0 }, { ...values, task_type: 'T2VA' });
+    env.setPlanning({ ...other, aiTrackGuideEnabled: true });
+    await env.api.generateAIShots(env.editor, [next.selectedShotId]);
+    await env.api.generateAIShots(env.editor, [other.selectedShotId]);
+    env.setPlanning({ ...env.planning(), scenes: env.planning().scenes.map(scene => ({ ...scene,
+        shots: scene.shots.map(shot => shot.id === next.selectedShotId ? { ...shot, aiTrackTransition: 'cut' } : shot),
+    })) });
+    await env.api.generateAIShots(env.editor, [next.selectedShotId]);
+    assert.deepEqual(seen, [undefined, video, undefined, undefined]);
+    assert.deepEqual(frames, [undefined, 22, undefined, undefined]);
+});
+
+test('an interrupted all export leaves a failed merged slot and retains completed shot media', async () => {
+    let runs = 0;
+    const env = await setup({ ...values, task_type: 'T2VA' }, {
+        onRun: () => { if (++runs > 1) throw new Error('GPU error'); return [{ filename: 'first.mp4' }]; },
+        onConcat: () => assert.fail('incomplete queues cannot be concatenated'),
+    });
+    const next = env.api.saveTextToVideoDraft(env.planning(), { startTime: 7.17, trackIndex: 1 }, { ...values, task_type: 'T2VA' });
+    env.setPlanning({ ...next, aiTrackOutputMode: 'all' });
+    await assert.rejects(env.api.generateAIShots(env.editor), /GPU error.*1\/2/);
+    assert.equal(env.assets.length, 1);
+    const clips = env.editor.timeline.getTracks().flatMap(track => track.elements);
+    assert.equal(clips.length, 1);
+    assert.equal(clips[0].directorGeneration.status, 'failed');
+    assert.equal(clips[0].directorGeneration.shotIds.length, 2);
+    assert.equal(env.shot().generationStatus, 'succeeded');
+});
+
+test('all output merges each touching same-track chain and exports isolated clips separately', async () => {
+    const concatenated = [], generated = [];
+    const env = await setup({ ...values, task_type: 'T2VA', prompt: 'first' }, {
+        onRun: ({ values: fields }) => {
+            generated.push(fields.prompt);
+            return [{ filename: `${fields.prompt}.mp4`, type: 'output' }];
+        },
+        onConcat: ({ files }) => {
+            concatenated.push(Array.from(files, file => file.filename));
+            return { filename: `merged-${concatenated.length}.mp4`, type: 'output' };
+        },
+    });
+    let planning = env.planning();
+    for (const [startTime, trackIndex, prompt] of [[7.17, 1, 'second'], [20, 1, 'third'], [25.17, 1, 'fourth'],
+        [40, 1, 'isolated'], [12.34, 0, 'other-track']]) {
+        planning = env.api.saveTextToVideoDraft(planning, { startTime, trackIndex }, { ...values, task_type: 'T2VA', prompt });
+    }
+    env.setPlanning({ ...planning, aiTrackOutputMode: 'all' });
+    const result = await env.api.generateAIShots(env.editor);
+    assert.deepEqual(generated, ['first', 'second', 'other-track', 'third', 'fourth', 'isolated']);
+    assert.deepEqual(concatenated, [['first.mp4', 'second.mp4'], ['third.mp4', 'fourth.mp4']]);
+    assert.equal(result.completed, 6);
+    assert.equal(result.merged, 2);
+    const clips = env.editor.timeline.getTracks().flatMap(track => track.elements);
+    assert.equal(clips.length, 4);
+    assert.deepEqual(Array.from(clips, clip => clip.startTime).sort((a, b) => a - b), [2, 12.34, 20, 40]);
+    assert.equal(clips.filter(clip => clip.name === 'AI 镜头 · 全部导出').length, 2);
+    assert.ok(clips.every(clip => !clip.directorGeneration));
+});
+
+test('all output does not merge across gaps, overlaps, tracks, or unselected clips', async () => {
+    const env = await setup({ ...values, task_type: 'T2VA' }, {
+        onRun: () => [{ filename: 'result.mp4', type: 'output' }],
+        onConcat: () => assert.fail('disconnected clips must remain separate'),
+    });
+    let planning = env.api.saveTextToVideoDraft(env.planning(), { startTime: 7.17, trackIndex: 1 }, { ...values, task_type: 'T2VA' });
+    planning = env.api.saveTextToVideoDraft(planning, { startTime: 12.34, trackIndex: 1 }, { ...values, task_type: 'T2VA' });
+    const thirdId = planning.selectedShotId;
+    planning = env.api.saveTextToVideoDraft(planning, { startTime: 17, trackIndex: 0 }, { ...values, task_type: 'T2VA' });
+    const overlapId = planning.selectedShotId;
+    planning = env.api.saveTextToVideoDraft(planning, { startTime: 22.17, trackIndex: 1 }, { ...values, task_type: 'T2VA' });
+    env.setPlanning({ ...planning, aiTrackOutputMode: 'all' });
+    const result = await env.api.generateAIShots(env.editor, [env.shotId, thirdId, overlapId, planning.selectedShotId]);
+    assert.equal(result.merged, 0);
+    assert.equal(env.editor.timeline.getTracks().flatMap(track => track.elements).length, 4);
+});
+
+test('segments stay separate and direct generation uses the saved seam frame count', async () => {
+    const env = await setup({ ...values, task_type: 'T2VA' }, {
+        onRun: () => [{ filename: 'result.mp4', type: 'output' }],
+        onResolveGuide: () => ({ filename: 'previous.mp4', type: 'output' }),
+        onConcat: () => assert.fail('segments output cannot concatenate'),
+    });
+    const next = env.api.saveTextToVideoDraft(env.planning(), { startTime: 7.17, trackIndex: 1 }, { ...values, task_type: 'T2VA' });
+    env.setPlanning({ ...next, aiTrackGuideEnabled: true, scenes: next.scenes.map(scene => ({ ...scene,
+        shots: scene.shots.map(shot => shot.id === next.selectedShotId ? { ...shot, aiTrackGuideFrames: 56 } : shot),
+    })) });
+    const result = await env.api.generateAIShots(env.editor);
+    assert.equal(result.outputMode, 'segments');
+    assert.equal(result.merged, 0);
+    assert.equal(env.editor.timeline.getTracks().flatMap(track => track.elements).length, 2);
+    await env.api.generateTextToVideo(env.editor, next.selectedShotId, 'module', { ...values, task_type: 'T2VA' });
+    const submitted = env.calls.filter(call => call.operation === 'capcut:run-workflow').at(-1).payload.values;
+    assert.equal(submitted.continuity_video.filename, 'previous.mp4');
+    assert.equal(submitted.continuity_frames, 56);
+    const edited = env.api.saveTextToVideoDraft(env.planning(), { startTime: 7.17, trackIndex: 1 },
+        { ...values, task_type: 'T2VA', duration: 6 }, next.selectedShotId);
+    assert.equal(edited.scenes.find(scene => scene.shots[0].id === next.selectedShotId).shots[0].aiTrackGuideFrames, 56);
 });

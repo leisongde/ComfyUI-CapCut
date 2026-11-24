@@ -39,6 +39,7 @@ export function TextToVideoDialog({ open, onOpenChange, mode, position, draftId,
   onGenerate: (moduleId: string, values: Record<string, unknown>) => void
 }) {
   const editor = useEditor()
+  const assets = editor.media.getAssets()
   const form = useRef<HTMLFormElement>(null)
   const uploadRequest = useRef(0)
   const [uploading, setUploading] = useState(false)
@@ -67,7 +68,7 @@ export function TextToVideoDialog({ open, onOpenChange, mode, position, draftId,
     : referenceUploads.length ? referenceUploads : frames.length ? [{ fields: frames }] : []
   const mediaId = (field: MediaField) => field.index === undefined ? values[field.name] : (values[field.name] as string[] | undefined)?.[field.index]
   const references: PromptReference[] = uploadGroups.flatMap(group => group.fields).flatMap(field => {
-    const media = editor.media.getAssets().find(asset => asset.id === mediaId(field) && asset.type === field.kind)
+    const media = assets.find(asset => asset.id === mediaId(field) && asset.type === field.kind)
     return media ? [{ kind: field.kind === 'image' ? 'Picture' : field.kind === 'video' ? 'Video' : 'Audio',
       number: field.index === undefined ? (field.name === 'last_frame' ? 2 : 1) : field.index + 1,
       name: media.name, thumbnail: field.kind === 'image' ? media.url ?? media.thumbnailUrl : media.thumbnailUrl }] : []
@@ -186,12 +187,13 @@ export function TextToVideoDialog({ open, onOpenChange, mode, position, draftId,
             <ArrowLeftRight size={14} />交换首尾帧
           </button></div>}
           <div className={mode === 'Ref2VA' || (referenceEdit && group.fields[0]?.kind !== 'video') ? 'reference-media-grid' : mode === 'FL2VA' ? 'text-to-video-grid' : undefined}>{group.fields.map(field => {
-          const media = editor.media.getAssets().find(asset => asset.id === mediaId(field) && asset.type === field.kind)
+          const media = assets.find(asset => asset.id === mediaId(field) && asset.type === field.kind)
           const label = mediaLabels[field.kind]
           const Icon = field.kind === 'image' ? ImagePlus : field.kind === 'audio' ? Music : Video
           return <div key={`${field.name}-${field.index ?? ''}`} className="image-to-video-input">
             <span>{field.label}</span>
-            <MediaUpload accept={field.accept} label={`${media ? '更换' : '上传'}${field.label}`} disabled={loading || busy || savingKey || uploading} onFileSelected={file => void uploadMedia(file, field)}>
+            <MediaUpload accept={field.accept} kind={field.kind} assets={assets} selectedId={media?.id} label={`${media ? '更换' : '上传'}${field.label}`} disabled={loading || busy || savingKey || uploading} onFileSelected={file => void uploadMedia(file, field)}
+              onAssetSelected={asset => { setError(''); updateMedia(field, asset.id) }}>
               {media && (field.kind === 'image' || media.thumbnailUrl) ? <img src={field.kind === 'image' ? media.url ?? media.thumbnailUrl : media.thumbnailUrl} alt={`${field.label}预览`} /> : <Icon size={28} />}
               <span>{uploading ? '正在保存素材…' : `${media ? '点击或拖拽更换' : '点击或拖拽上传'}${label}`}</span>
             </MediaUpload>

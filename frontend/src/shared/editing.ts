@@ -131,6 +131,7 @@ export interface EditingDirectorGenerationProgress {
 }
 
 export interface EditingDirectorGenerationSlot {
+  aiTrackBatch?: true
   requestId: string
   sceneId: string
   shotIds: string[]
@@ -163,6 +164,9 @@ export interface EditingDirectorShot {
   prompt: string
   taskType: EditingDirectorTaskType
   continuityFromPrev: boolean
+  /** AI timeline seam preference, separate from imported Director scene settings. */
+  aiTrackTransition?: 'guide' | 'cut'
+  aiTrackGuideFrames?: number
   videoClipId?: string
   imageAssetId?: string
   firstFrameAssetId?: string
@@ -204,6 +208,8 @@ export interface EditingDirectorPlanningState {
   scenes: EditingDirectorScene[]
   assetMap: Record<string, string>
   selectedShotId?: string
+  aiTrackGuideEnabled?: boolean
+  aiTrackOutputMode?: 'segments' | 'all'
   /** Number of AI timeline rows, including empty rows. */
   trackCount?: number
   /** Persist one user-created empty AI row until director shots are added. */
@@ -543,6 +549,8 @@ export type EditingOperation =
   | 'media:update-metadata'
   | 'media:remove'
   | 'media:import-canvas-asset'
+  | 'capcut:shot-guide-file'
+  | 'capcut:concat-ai-shots'
   | 'library:list'
   | 'library:folders:list'
   | 'library:read'

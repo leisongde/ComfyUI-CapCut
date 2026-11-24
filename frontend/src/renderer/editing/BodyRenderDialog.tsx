@@ -33,8 +33,8 @@ export function BodyRenderDialog({ mode, open, onOpenChange, position, draftId, 
   const relayVSR = mode === 'RelayVSR'
   const title = relayVSR ? 'Relay VSR 视频放大' : '视频转白模'
   const nodeType = relayVSR ? 'CapCutRelayVSRWorkflow' : 'CapCutBodyRenderWorkflow'
-  const videoAssets = editor.media.getAssets().filter(asset => asset.type === 'video')
-  const asset = videoAssets.find(asset => asset.id === values.source_video)
+  const assets = editor.media.getAssets()
+  const asset = assets.find(asset => asset.id === values.source_video && asset.type === 'video')
 
   useEffect(() => {
     if (!open) return
@@ -94,12 +94,10 @@ export function BodyRenderDialog({ mode, open, onOpenChange, position, draftId, 
       <fieldset disabled={disabled}>
         <div className="image-to-video-input">
           <span>原视频</span>
-          {relayVSR && videoAssets.length > 0 && <label>工程素材<select value={asset?.id ?? ''} onChange={event => {
-            const id = event.target.value
-            setValues(previous => ({ ...previous, source_video: id }))
+          <MediaUpload accept="video/*" kind="video" assets={assets} selectedId={asset?.id} label={`${asset ? '更换' : '上传'}原视频`} disabled={disabled} onFileSelected={file => void upload(file)} onAssetSelected={asset => {
             setError('')
-          }}><option value="">选择视频</option>{videoAssets.map(video => <option key={video.id} value={video.id}>{video.name}</option>)}</select></label>}
-          <MediaUpload accept="video/*" label={`${asset ? '更换' : '上传'}原视频`} disabled={disabled} onFileSelected={file => void upload(file)}>
+            setValues(previous => ({ ...previous, source_video: asset.id, duration: asset.duration ?? 5 }))
+          }}>
             {asset?.thumbnailUrl ? <img src={asset.thumbnailUrl} alt="原视频预览" /> : <Video size={28} />}
             <span>{uploading ? '正在保存素材…' : `点击或拖拽${asset ? '更换' : '上传'}`}</span>
           </MediaUpload>

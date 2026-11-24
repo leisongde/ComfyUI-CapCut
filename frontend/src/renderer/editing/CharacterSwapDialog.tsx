@@ -30,6 +30,7 @@ export function CharacterSwapDialog({ open, onOpenChange, position, draftId, ini
   onGenerate: (moduleId: string, values: Record<string, unknown>) => void
 }) {
   const editor = useEditor()
+  const assets = editor.media.getAssets()
   const form = useRef<HTMLFormElement>(null)
   const uploadRequest = useRef(0)
   const [module, setModule] = useState<Module | null>(null)
@@ -44,7 +45,7 @@ export function CharacterSwapDialog({ open, onOpenChange, position, draftId, ini
   const modelRequest = useRef(0)
   const enhancementEnabled = values.enhance_prompt === 'on'
   const disabled = loading || busy || Boolean(uploading) || savingKey
-  const assetFor = (field: typeof mediaFields[number]) => editor.media.getAssets().find(asset => asset.id === values[field.name] && asset.type === field.kind)
+  const assetFor = (field: typeof mediaFields[number]) => assets.find(asset => asset.id === values[field.name] && asset.type === field.kind)
   const references: PromptReference[] = mediaFields.flatMap(field => {
     const asset = assetFor(field)
     return asset ? [{ kind: field.kind === 'image' ? 'Picture' : 'Video', number: 1, name: asset.name,
@@ -147,7 +148,8 @@ export function CharacterSwapDialog({ open, onOpenChange, position, draftId, ini
           const Icon = field.kind === 'image' ? ImagePlus : Video
           return <div key={field.name} className="image-to-video-input">
             <span>{field.label}</span>
-            <MediaUpload accept={field.accept} label={`${asset ? '更换' : '上传'}${field.label}`} disabled={disabled} onFileSelected={file => void upload(file, field)}>
+            <MediaUpload accept={field.accept} kind={field.kind} assets={assets} selectedId={asset?.id} label={`${asset ? '更换' : '上传'}${field.label}`} disabled={disabled} onFileSelected={file => void upload(file, field)}
+              onAssetSelected={asset => { setError(''); update(field.name, asset.id) }}>
               {asset && (field.kind === 'image' || asset.thumbnailUrl) ? <img src={field.kind === 'image' ? asset.url ?? asset.thumbnailUrl : asset.thumbnailUrl} alt={`${field.label}预览`} /> : <Icon size={28} />}
               <span>{uploading === field.name ? '正在保存素材…' : `点击或拖拽${asset ? '更换' : '上传'}`}</span>
             </MediaUpload>

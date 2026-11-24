@@ -13,6 +13,7 @@ from aiohttp import ClientError, ClientSession, ClientTimeout, web
 
 import folder_paths
 from server import PromptServer
+from . import ai_video
 from .api import load_project, media_directory, number, project_path, root, same_origin, save_json
 from .captions import CaptionService
 from .tracking import MAX_FRAME_BYTES, TrackingService
@@ -207,6 +208,19 @@ async def perform_operation(request, operation, payload, uploaded):
         else:
             await asyncio.to_thread(path.unlink, missing_ok=True)
         return {"saved": bool(key)}
+    if operation == "capcut:concat-ai-shots":
+        return await asyncio.to_thread(ai_video.concatenate_shots, payload["files"])
+    if operation == "capcut:shot-guide-file":
+        project_id = payload["projectId"]
+        asset = read_json(media_index_path(directory, project_id), {}).get(payload["assetId"])
+        if not asset or asset["type"] != "video":
+            return None
+        file = {"filename": asset["fileName"], "subfolder": f"CapCut/{directory.parent.name}/{project_id}", "type": "input"}
+        try:
+            ai_video.video_path(file, ("input",))
+        except ValueError:
+            return None
+        return file
     if operation == "projects:load":
         return await asyncio.to_thread(open_document, directory, payload["id"])
     if operation == "projects:create":

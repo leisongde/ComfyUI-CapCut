@@ -32,6 +32,7 @@ export function MotionTransferDialog({ open, onOpenChange, position, draftId, in
   onGenerate: (moduleId: string, values: Record<string, unknown>) => void
 }) {
   const editor = useEditor()
+  const assets = editor.media.getAssets()
   const form = useRef<HTMLFormElement>(null)
   const uploadRequest = useRef(0)
   const keyWrites = useRef<Promise<unknown>>(Promise.resolve())
@@ -42,7 +43,7 @@ export function MotionTransferDialog({ open, onOpenChange, position, draftId, in
   const [preparing, setPreparing] = useState(false)
   const [error, setError] = useState('')
   const disabled = loading || busy || Boolean(uploading) || preparing
-  const video = editor.media.getAssets().find(asset => asset.id === values.source_video && asset.type === 'video')
+  const video = assets.find(asset => asset.id === values.source_video && asset.type === 'video')
   const imageIds = imageIdsBySlot(values)
 
   useEffect(() => {
@@ -138,7 +139,8 @@ export function MotionTransferDialog({ open, onOpenChange, position, draftId, in
       <fieldset disabled={disabled}>
         <div className="image-to-video-input">
           <span>驱动视频</span>
-          <MediaUpload accept="video/*" label={`${video ? '更换' : '上传'}驱动视频`} disabled={disabled} onFileSelected={file => void upload(file)}>
+          <MediaUpload accept="video/*" kind="video" assets={assets} selectedId={video?.id} label={`${video ? '更换' : '上传'}驱动视频`} disabled={disabled} onFileSelected={file => void upload(file)}
+            onAssetSelected={asset => { setError(''); update('source_video', asset.id) }}>
             {video?.thumbnailUrl ? <img src={video.thumbnailUrl} alt="驱动视频预览" /> : <Video size={28} />}
             <span>{uploading === '驱动视频' ? '正在保存素材…' : `点击或拖拽${video ? '更换' : '上传'}`}</span>
           </MediaUpload>
@@ -146,10 +148,11 @@ export function MotionTransferDialog({ open, onOpenChange, position, draftId, in
           {(video || values.source_video) && <div className="image-to-video-caption"><small>{video?.name ?? '素材已移除，请重新上传'}</small><button type="button" onClick={() => update('source_video', '')}>移除</button></div>}
         </div>
         <div className="text-to-video-grid">{colors.map((color, index) => {
-          const asset = editor.media.getAssets().find(asset => asset.id === imageIds[index] && asset.type === 'image')
+          const asset = assets.find(asset => asset.id === imageIds[index] && asset.type === 'image')
           return <div key={index} className="image-to-video-input">
             <span>图 {index + 1} · {color}色角色</span>
-            <MediaUpload accept={imageAccept} label={`${asset ? '更换' : '上传'}图 ${index + 1}`} disabled={disabled} onFileSelected={file => void upload(file, index)}>
+            <MediaUpload accept={imageAccept} kind="image" assets={assets} selectedId={asset?.id} label={`${asset ? '更换' : '上传'}图 ${index + 1}`} disabled={disabled} onFileSelected={file => void upload(file, index)}
+              onAssetSelected={asset => { setError(''); updateImage(index, asset.id) }}>
               {asset ? <img src={asset.url ?? asset.thumbnailUrl} alt={`图 ${index + 1}预览`} /> : <ImagePlus size={28} />}
               <span>{uploading === `图 ${index + 1}` ? '正在保存素材…' : `点击或拖拽${asset ? '更换' : '上传'}`}</span>
             </MediaUpload>

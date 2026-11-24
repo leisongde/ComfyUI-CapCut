@@ -39,7 +39,7 @@ export function createDirectorGenerationPlan(scene: EditingDirectorScene, fps: n
   return { requestId: generateUUID(), scene, orderedShots, selected, exportMode }
 }
 
-export type DirectorGenerationPlan = ReturnType<typeof createDirectorGenerationPlan>
+export type DirectorGenerationPlan = ReturnType<typeof createDirectorGenerationPlan> & { aiTrackBatch?: true }
 
 const sameShots = (left: string[], right: string[]) =>
   left.length === right.length && left.every((id) => right.includes(id))
@@ -101,7 +101,8 @@ export function reserveDirectorGenerationPlaceholders(
         requestId: plan.requestId,
         sceneId: plan.scene.id,
         shotIds: shots.map((shot) => shot.id),
-        status: 'queued'
+        status: 'queued',
+        ...(plan.aiTrackBatch && { aiTrackBatch: true })
       }
     }
     next = next.map((track) =>

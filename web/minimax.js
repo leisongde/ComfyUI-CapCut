@@ -226,7 +226,39 @@ export function buildMinimaxPrompt(template, configuration, values) {
         enhance["补充上下文"] = `${duration} 秒，24 fps，${values.aspect_ratio}。${textOnly ? "纯文生视频，没有图片、视频或音频参考素材。" : imageOnly ? "使用一张首帧图片生成视频，没有尾帧或其他参考素材。" : firstLastFrames ? "使用首帧和尾帧图片生成视频，分别对应起始和结束画面，没有其他参考素材。" : referenceEdit ? "视频+参考修改：<Video 1> 是需要修改的原始视频；参考图片使用 <Picture 1> 等编号，参考音频使用 <Audio 1> 等编号。根据用户提示词和参考素材修改原始视频。" : videoEdit ? "视频编辑：仅上传一个待编辑视频，标记为 <Video 1>。根据用户提示词编辑源视频，没有参考图片或独立音频。" : "参考图片、视频、音频按选择顺序编号。"}`;
         conditioning.prompt = ["73", 0];
     } else delete prompt["73"];
+    if (values.continuity_video) applyShotGuide(prompt, values, duration);
     return prompt;
+}
+
+function applyShotGuide(prompt, values, duration) {
+    const file = values.continuity_video;
+    if (!["T2VA", "Ref2VA"].includes(values.task_type) || prompt["6"].inputs.audio_mode !== "native" ||
+        values.final_audio?.length || values.selflift_enabled === true || values.refine_enabled === true) {
+        throw new Error("该生成模式不能使用段间引导");
+    }
+    if (typeof file.filename !== "string" || !["input", "output", "temp"].includes(file.type)) {
+        throw new Error("前段成片无效");
+    }
+    const guideFrames = Number(values.continuity_frames ?? 22);
+    const outputFrames = Math.round(duration * 24);
+    const total = outputFrames + guideFrames;
+    const aligned = total + (5 - total % 17 + 17) % 17;
+    prompt["6"].inputs.length = aligned;
+    delete prompt["14"];
+    delete prompt["15"];
+    prompt.capcut_guide_tail = { class_type: "CapCutShotGuideTail", inputs: {
+        filename: file.filename, subfolder: file.subfolder ?? "", file_type: file.type,
+        width: ["16", 0], height: ["16", 1], guide_frames: guideFrames,
+    } };
+    prompt.capcut_shot_guide = { class_type: "MiniMaxH3BranchGuideEXPT8", inputs: {
+        positive: ["6", 0], latent: ["6", 1], frame_idx: 0, vae: ["4", 0], audio_vae: ["5", 0],
+        image: ["capcut_guide_tail", 0], audio: ["capcut_guide_tail", 1],
+    } };
+    prompt["8"].inputs.conditioning = ["capcut_shot_guide", 0];
+    prompt.capcut_trim_guide = { class_type: "CapCutTrimShotGuide", inputs: {
+        images: ["11", 0], audio: ["11", 1], output_frames: outputFrames, guide_frames: guideFrames,
+    } };
+    Object.assign(prompt["12"].inputs, { images: ["capcut_trim_guide", 0], audio: ["capcut_trim_guide", 1] });
 }
 
 async function jsonRequest(path) {
@@ -301,7 +333,7 @@ registerCapCutWorkflow("CapCutMiniMaxH3Workflow", {
         const missing = [...new Set(Object.values(output).map(item => item.class_type))].filter(type => !definitions[type]);
         if (missing.length) throw new Error(`缺少工作流节点：${missing.join("、")}。请安装原工作流依赖并重启 ComfyUI`);
         let promptId;
-        const stages = { "62": "加载视频模型", "3": "加载文本编码器", "73": "提示词增强", "6": "准备视频条件", "7": "配置采样器", "10": values.selflift_enabled === true ? "SelfLift 渐进采样" : "视频采样", capcut_refine: "放大与二采", "11": "视频解码", "12": "保存视频" };
+        const stages = { "62": "加载视频模型", "3": "加载文本编码器", "73": "提示词增强", "6": "准备视频条件", capcut_guide_tail: "读取前段末尾", capcut_shot_guide: "应用段间引导", "7": "配置采样器", "10": values.selflift_enabled === true ? "SelfLift 渐进采样" : "视频采样", capcut_refine: "放大与二采", "11": "视频解码", "12": "保存视频" };
         const samplingNodes = ["10", "capcut_refine"];
         const executing = event => {
             if (event.detail.prompt_id !== promptId || !promptId) return;

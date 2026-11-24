@@ -580,3 +580,42 @@ test("the unified workflow connects MiniMax generation to the main console", asy
     assert.equal(link[5], "CAPCUT_WORKFLOW");
     assert.ok(module.outputs[link[2]].links.includes(link[0]));
 });
+
+test('continuity anchors the previous tail at frame zero and trims both streams to the requested duration', async () => {
+    const { buildMinimaxPrompt, values } = await adapter();
+    const tail = { filename: 'prev.mp4', subfolder: 'MiniMaxH3', type: 'output' };
+    for (const taskType of ['T2VA', 'Ref2VA']) {
+        const fields = { ...values, duration: 5.17, continuity_video: tail, task_type: taskType,
+            ref_images: taskType === 'Ref2VA' ? [file('portrait.png')] : [] };
+        const graph = buildMinimaxPrompt(template, {}, fields);
+        assert.equal(graph['6'].inputs.length, 158);
+        assert.equal(graph['14'], undefined);
+        assert.equal(graph.capcut_guide_tail.inputs.filename, 'prev.mp4');
+        assert.equal(graph.capcut_guide_tail.inputs.guide_frames, 22);
+        assert.equal(graph.capcut_shot_guide.class_type, 'MiniMaxH3BranchGuideEXPT8');
+        assert.equal(graph.capcut_shot_guide.inputs.frame_idx, 0);
+        assert.deepEqual(Array.from(graph['8'].inputs.conditioning), ['capcut_shot_guide', 0]);
+        assert.deepEqual(Array.from(graph.capcut_shot_guide.inputs.audio), ['capcut_guide_tail', 1]);
+        assert.equal(graph.capcut_trim_guide.inputs.output_frames, 124);
+        assert.equal(graph.capcut_trim_guide.inputs.guide_frames, 22);
+        assert.deepEqual(Array.from(graph['12'].inputs.images), ['capcut_trim_guide', 0]);
+        assert.deepEqual(Array.from(graph['12'].inputs.audio), ['capcut_trim_guide', 1]);
+        for (const node of Object.values(graph)) for (const value of Object.values(node.inputs)) {
+            if (Array.isArray(value)) assert.ok(graph[value[0]], `Dangling link ${value[0]}`);
+        }
+    }
+    assert.throws(() => buildMinimaxPrompt(template, {}, { ...values, continuity_video: tail, refine_enabled: true }), /不能使用段间引导/);
+});
+
+test('each continuity frame choice reaches tail extraction, sample length and video/audio trimming', async () => {
+    const { buildMinimaxPrompt, values } = await adapter();
+    for (const frames of [5, 22, 39, 56]) {
+        const graph = buildMinimaxPrompt(template, {}, { ...values, duration: 5.17, task_type: 'T2VA',
+            continuity_video: { filename: 'prev.mp4', type: 'output' }, continuity_frames: frames });
+        assert.equal(graph.capcut_guide_tail.inputs.guide_frames, frames);
+        assert.equal(graph.capcut_trim_guide.inputs.guide_frames, frames);
+        assert.equal(graph.capcut_trim_guide.inputs.output_frames, 124);
+        assert.ok(graph['6'].inputs.length >= 124 + frames);
+        assert.equal((graph['6'].inputs.length - 5) % 17, 0);
+    }
+});

@@ -1,6 +1,7 @@
 import { generateUUID } from '@/utils/id'
 import type { EditorCore } from '@/core'
 import type { EditingDirectorPlanningState, EditingDirectorShot } from '../../shared/editing'
+import { getAIShotExportGroups, getAIShotGuideFrames, getAIShotPredecessors, getAITrackOutputMode, supportsAIShotGuide } from './ai-shot-output'
 import { getDirectorTrackCount, removeEmptyDirectorTrack } from '../../shared/editing-director-tracks'
 import { buildVideoElement } from '@/lib/timeline/element-utils'
 import { processMediaAssets } from '@/lib/media/processing'
@@ -17,6 +18,8 @@ const activeRequests = new Set<string>()
 let shotQueueActive = false
 
 type GenerationModule = { id: string; nodeType: string; fields: Array<{ name: string; default: unknown; type?: string; kind?: string; multiple?: boolean }> }
+type ShotFile = { filename: string; subfolder: string; type: string }
+type ShotRunOptions = { guideFile?: ShotFile; combinedSlotId?: string }
 export type ShotQueueProgress = { shotIds: string[]; index: number; title: string }
 
 function savedShotRequest(editor: EditorCore, shotId: string, modules: GenerationModule[], key: string, motionKey: string) {
@@ -54,24 +57,54 @@ function savedShotRequest(editor: EditorCore, shotId: string, modules: Generatio
   return { moduleId: module.id, values }
 }
 
+async function resolveShotGuide(
+  shot: EditingDirectorShot,
+  previous: EditingDirectorShot | undefined,
+  values: Record<string, unknown>,
+  projectId: string,
+  completed?: Map<string, ShotFile>
+) {
+  if (!previous) return
+  const warn = (reason: string) => toast.warning(`${shot.title}将按硬切生成`, { description: reason })
+  if (!supportsAIShotGuide(values)) {
+    warn('段间引导适用于文生视频和多参考生视频的基础采样')
+    return
+  }
+  const generated = completed?.get(previous.id)
+  if (generated) return generated
+  const version = previous.outputVersions.find(item => item.id === previous.activeOutputVersionId && item.status === 'ready')
+  if (version) {
+    const file = await request<ShotFile | null>('capcut:shot-guide-file', { projectId, assetId: version.assetId })
+    if (file) return file
+  }
+  warn(`找不到「${previous.title}」的成片。要续接，请先生成上段，或把两段一起加入本轮队列。`)
+}
+
 export async function generateAIShots(editor: EditorCore, shotIds?: string[], onProgress?: (progress: ShotQueueProgress) => void) {
   if (shotQueueActive || activeRequests.size) throw new Error('已有镜头正在生成，请等待视频取回后再生成')
-  const projectId = editor.project.getActive().metadata.id
-  const shots = getDirectorPlanning(editor.project.getActive())?.scenes.flatMap(scene => scene.shots) ?? []
+  const project = editor.project.getActive()
+  const projectId = project.metadata.id
+  const planning = getDirectorPlanning(project)
+  const shots = planning?.scenes.flatMap(scene => scene.shots) ?? []
+  const predecessors = planning?.aiTrackGuideEnabled === true ? getAIShotPredecessors(shots, project.settings.fps) : new Map<string, EditingDirectorShot>()
+  const outputMode = getAITrackOutputMode(planning)
   const candidates = (shotIds ? shotIds.map(id => shots.find(shot => shot.id === id)).filter((shot): shot is EditingDirectorShot => Boolean(shot)) : shots)
     .sort((a, b) => a.startTime - b.startTime || (a.trackIndex ?? 0) - (b.trackIndex ?? 0))
   if (!candidates.length) throw new Error(shotIds ? '请先选择一个 AI 镜头' : '没有可生成的 AI 镜头')
   if (shots.some(shot => ['queued', 'running'].includes(shot.generationStatus))) throw new Error('已有镜头正在生成，请等待视频取回后再生成')
   shotQueueActive = true
+  let combinedPlans: Array<ReturnType<typeof createDirectorGenerationPlan>> = []
+  let merged = 0
   try {
     const needsMotionKey = candidates.some(shot => findDirectorScene(getDirectorPlanning(editor.project.getActive())!, shot.id)?.settings.task_type === 'MotionTransfer')
     const [modules, saved, motionSaved] = await Promise.all([request<GenerationModule[]>('capcut:workflows' as never),
       request<{ key: string }>('capcut:minimax-key:get' as never),
       needsMotionKey ? request<{ key: string }>('capcut:motion-transfer-key:get' as never) : Promise.resolve({ key: '' })])
     if (editor.project.getActiveOrNull()?.metadata.id !== projectId) throw new Error('工程已切换，生成队列已停止')
-    const ready: string[] = [], skipped: string[] = []
+    const ready: Array<{ shot: EditingDirectorShot; moduleId: string; values: Record<string, unknown> }> = []
+    const skipped: string[] = []
     for (const shot of candidates) {
-      try { savedShotRequest(editor, shot.id, modules, saved.key, motionSaved.key); ready.push(shot.id) }
+      try { ready.push({ shot, ...savedShotRequest(editor, shot.id, modules, saved.key, motionSaved.key) }) }
       catch (error) {
         const reason = `${shot.title}：${(error as Error).message}`
         if (shotIds) throw new Error(reason)
@@ -79,14 +112,37 @@ export async function generateAIShots(editor: EditorCore, shotIds?: string[], on
       }
     }
     if (!ready.length) throw new Error(`没有准备好的镜头。${skipped[0]}`)
-    let completed = 0
-    for (const [index, shotId] of ready.entries()) {
-      if (editor.project.getActiveOrNull()?.metadata.id !== projectId) throw new Error('工程已切换，生成队列已停止')
-      const shot = findDirectorShot(getDirectorPlanning(editor.project.getActive())!, shotId)
-      if (!shot) throw new Error('待生成片段已移除，生成队列已停止')
-      onProgress?.({ shotIds: ready, index, title: shot.title })
+    const currentPlanning = () => {
+      const active = editor.project.getActiveOrNull()
+      return active?.metadata.id === projectId ? getDirectorPlanning(active) : null
+    }
+    const readyIds = ready.map(({ shot }) => shot.id)
+    const combinedTitle = 'AI 镜头 · 全部导出'
+    if (outputMode === 'all') {
+      combinedPlans = getAIShotExportGroups(ready.map(({ shot }) => shot), project.settings.fps)
+        .filter(group => group.length > 1).map(group => {
+          if (group.length > 128) throw new Error('全部导出每组最多支持 128 个相邻镜头，请缩小生成范围')
+          const firstScene = findDirectorScene(currentPlanning()!, group[0].id)!
+          return createDirectorGenerationPlan({ ...firstScene, title: combinedTitle, shots: group,
+            settings: { ...firstScene.settings, directorRunSelectEnabled: false } }, project.settings.fps)
+        })
+      for (const plan of combinedPlans) {
+        activeRequests.add(plan.requestId)
+        editor.timeline.updateTracks(reserveDirectorGenerationPlaceholders(editor.timeline.getTracks(), {
+          ...plan, exportMode: 'all', aiTrackBatch: true
+        }))
+      }
+    }
+    const combinedByShot = new Map(combinedPlans.flatMap(plan => plan.selected.map(shot => [shot.id, plan] as const)))
+    const completedFiles = new Map<string, ShotFile>()
+    for (const [index, { shot, moduleId, values }] of ready.entries()) {
+      const current = currentPlanning()
+      if (!current) throw new Error('工程已切换，生成队列已停止')
+      if (!findDirectorShot(current, shot.id)) throw new Error('待生成片段已移除，生成队列已停止')
+      onProgress?.({ shotIds: readyIds, index, title: shot.title })
       try {
-        const { moduleId, values } = savedShotRequest(editor, shotId, modules, saved.key, motionSaved.key)
+        const previous = shot.aiTrackTransition !== 'cut' ? predecessors.get(shot.id) : undefined
+        const guideFile = await resolveShotGuide(shot, previous, values, projectId, completedFiles)
         if (values.task_type === 'MotionTransfer') {
           const video = editor.media.getAssets().find(asset => asset.id === values.source_video)!
           const input = new Input({ source: new BlobSource(video.file), formats: ALL_FORMATS })
@@ -94,15 +150,45 @@ export async function generateAIShots(editor: EditorCore, shotIds?: string[], on
           finally { input.dispose() }
           if (editor.project.getActiveOrNull()?.metadata.id !== projectId) throw new Error('工程已切换')
         }
-        await runTextToVideo(editor, shotId, moduleId, values)
-        if (editor.project.getActiveOrNull()?.metadata.id !== projectId) throw new Error('工程已切换')
-        if (findDirectorShot(getDirectorPlanning(editor.project.getActive())!, shotId)?.generationStatus !== 'succeeded') throw new Error('片段已移除，结果未写回')
+        if (!currentPlanning()) throw new Error('工程已切换')
+        const combined = combinedByShot.get(shot.id)
+        const file = await runTextToVideo(editor, shot.id, moduleId, values, { guideFile, combinedSlotId: combined?.requestId })
+        if (!currentPlanning()) throw new Error('工程已切换')
+        if (!file) throw new Error('片段已移除，结果未写回')
         await editor.save.flush()
-      } catch (error) { throw new Error(`${shot.title}：${(error as Error).message}；队列已停止（已完成 ${completed}/${ready.length}）`) }
-      completed++
+        completedFiles.set(shot.id, file)
+        if (combined && combined.selected.at(-1)?.id === shot.id) {
+          onProgress?.({ shotIds: readyIds, index, title: '正在合并相邻片段' })
+          const ids = combined.selected.map(item => item.id)
+          const output = await request<ShotFile>('capcut:concat-ai-shots',
+            { files: ids.map(id => completedFiles.get(id)) }, [], 31 * 60 * 1000)
+          const imported = await importShotFile(editor, output, projectId, currentPlanning)
+          if (!imported) throw new Error('工程已切换，合并成片已保存到 ComfyUI 输出目录')
+          const filled = fillDirectorGenerationPlaceholder(editor.timeline.getTracks(), ids,
+            buildVideoElement({ mediaId: imported.id, name: combinedTitle,
+              duration: imported.duration ?? combined.selected.reduce((sum, item) => sum + item.duration, 0),
+              startTime: combined.selected[0].startTime }), combined.requestId)
+          if (filled) editor.timeline.updateTracks(filled.tracks)
+          else toast.warning('合并占位已移除，完整成片已加入素材库')
+          await editor.save.flush()
+          merged++
+        }
+      } catch (error) {
+        throw new Error(`${shot.title}：${(error as Error).message}。队列已停止（已完成 ${completedFiles.size}/${ready.length}）`)
+      }
     }
-    return { completed, skipped }
-  } finally { shotQueueActive = false }
+    return { completed: completedFiles.size, skipped, outputMode, merged }
+  } catch (error) {
+    if (combinedPlans.length && editor.project.getActiveOrNull()?.metadata.id === projectId) {
+      for (const plan of combinedPlans) editor.timeline.updateTracks(
+        updateDirectorGenerationPlaceholders(editor.timeline.getTracks(), plan.requestId, 'failed', (error as Error).message))
+      await editor.save.flush()
+    }
+    throw error
+  } finally {
+    for (const plan of combinedPlans) activeRequests.delete(plan.requestId)
+    shotQueueActive = false
+  }
 }
 
 function validateGenerationInputs(taskType: string, mode: string, values: Record<string, unknown>) {
@@ -124,6 +210,13 @@ export function recoverTextToVideoGenerations(editor: EditorCore) {
   if (!planning) return
   let tracks = editor.timeline.getTracks()
   let changed = false
+  for (const slot of getDirectorGenerationPlaceholders(tracks)) {
+    const state = slot.directorGeneration
+    if (state.aiTrackBatch && state.status !== 'failed' && !activeRequests.has(state.requestId)) {
+      tracks = updateDirectorGenerationPlaceholders(tracks, state.requestId, 'failed', '合并导出已中断，请重新生成')
+      changed = true
+    }
+  }
   for (const scene of planning.scenes) for (const shot of scene.shots) {
     if (shot.taskType === 'r2v' && !['Ref2VA', 'CharacterSwap', 'BodyRender', 'MotionTransfer', 'RelayVSR'].includes(String(scene.settings.task_type))) continue
     if (shot.taskType === 'v2v' && !['V2VA', 'V2VARef'].includes(String(scene.settings.task_type))) continue
@@ -199,11 +292,38 @@ export function saveTextToVideoDraft(planning: EditingDirectorPlanningState, pos
 
 /** Keep the request independent of the parameter dialog, which closes while generation runs. */
 export async function generateTextToVideo(editor: EditorCore, shotId: string, moduleId: string, values: Record<string, unknown>) {
-  if (shotQueueActive) throw new Error('生成队列执行中，请等待视频取回后再生成')
-  return runTextToVideo(editor, shotId, moduleId, values)
+  if (shotQueueActive || activeRequests.size) throw new Error('生成队列执行中，请等待视频取回后再生成')
+  const project = editor.project.getActive()
+  const planning = getDirectorPlanning(project)
+  const shot = planning && findDirectorShot(planning, shotId)
+  if (!shot) throw new Error('AI 片段已移除')
+  if (planning?.aiTrackGuideEnabled !== true || shot.aiTrackTransition === 'cut') {
+    return runTextToVideo(editor, shotId, moduleId, values)
+  }
+  const previous = getAIShotPredecessors(planning.scenes.flatMap(scene => scene.shots), project.settings.fps).get(shotId)
+  shotQueueActive = true
+  try {
+    const guideFile = await resolveShotGuide(shot, previous, values, project.metadata.id)
+    if (editor.project.getActiveOrNull()?.metadata.id !== project.metadata.id) throw new Error('工程已切换')
+    return await runTextToVideo(editor, shotId, moduleId, values, { guideFile })
+  } finally { shotQueueActive = false }
 }
 
-async function runTextToVideo(editor: EditorCore, shotId: string, moduleId: string, values: Record<string, unknown>) {
+async function importShotFile(editor: EditorCore, file: ShotFile, projectId: string, current: () => unknown) {
+  if (!current()) return
+  const result = await request<{ name: string; bytes: Uint8Array; mimeType: string }>('capcut:import-result' as never, { file, projectId })
+  if (!current()) return
+  const assets = await processMediaAssets({ files: [new File([result.bytes], result.name, { type: result.mimeType })] })
+  const asset = assets.find(item => item.type === 'video')
+  if (!asset) throw new Error('无法读取生成的视频，请从 ComfyUI 生成结果重新导入')
+  if (!current()) return
+  const id = await editor.media.addMediaAsset({ projectId, asset })
+  if (nativeStorageState.error) throw nativeStorageState.error
+  if (current()) return { id, duration: asset.duration }
+}
+
+async function runTextToVideo(editor: EditorCore, shotId: string, moduleId: string, values: Record<string, unknown>,
+  { guideFile, combinedSlotId }: ShotRunOptions = {}) {
   const project = editor.project.getActive()
   const projectId = project.metadata.id
   const planning = getDirectorPlanning(project)
@@ -225,7 +345,8 @@ async function runTextToVideo(editor: EditorCore, shotId: string, moduleId: stri
   const requestId = plan.requestId
   activeRequests.add(requestId)
   setDirectorPlanning(editor, updateDirectorShot(planning, shotId, { generationId: requestId, generationStatus: 'queued' }))
-  editor.timeline.updateTracks(reserveDirectorGenerationPlaceholders(editor.timeline.getTracks(), plan))
+  if (combinedSlotId) editor.timeline.updateTracks(updateDirectorGenerationPlaceholders(editor.timeline.getTracks(), combinedSlotId, 'running'))
+  else editor.timeline.updateTracks(reserveDirectorGenerationPlaceholders(editor.timeline.getTracks(), plan))
   const current = () => {
     if (editor.project.getActiveOrNull()?.metadata.id !== projectId) return null
     const latest = getDirectorPlanning(editor.project.getActive())
@@ -248,6 +369,8 @@ async function runTextToVideo(editor: EditorCore, shotId: string, moduleId: stri
     await editor.save.flush()
     if (!current()) return
     const { seed_mode, seed: fixedSeed, ...workflowValues } = values
+    delete workflowValues.continuity_video
+    delete workflowValues.continuity_frames
     let seed = fixedSeed == null ? undefined : Number(fixedSeed)
     if (!bodyRender && seed_mode === 'random') seed = Math.floor(Math.random() * 100_000_000)
     const generationValues = relayVSR ? {
@@ -267,8 +390,9 @@ async function runTextToVideo(editor: EditorCore, shotId: string, moduleId: stri
     } : characterSwap ? { ...workflowValues, seed, duration: shot.duration, start_time: 0, task_type: 'CharacterSwap' } : { ...workflowValues, seed, duration: shot.duration, task_type: referenceEdit ? 'V2VARef' : videoEdit ? 'V2VA' : referenceToVideo ? 'Ref2VA' : firstLastFrames ? 'FL2VA' : imageToVideo ? 'I2VA' : 'T2VA', enhance_prompt: values.enhance_prompt === 'off' ? 'off' : 'on', audio_mode: 'native',
       first_frame: imageToVideo ? values.first_frame : '', last_frame: firstLastFrames ? values.last_frame : '',
       ref_images: referenceToVideo || referenceEdit ? values.ref_images ?? [] : [], ref_videos: videoEdit ? (values.ref_videos as string[]).slice(0, 1) : referenceToVideo ? values.ref_videos ?? [] : [], ref_audios: referenceToVideo || referenceEdit ? values.ref_audios ?? [] : [], drive_audio: '', final_audio: '' }
-    const files = await request<Array<{ filename: string; subfolder: string; type: string }>>('capcut:run-workflow' as never,
-      { id: moduleId, values: generationValues, settings: project.settings, projectId }, [], 24 * 60 * 60 * 1000, progress)
+    const submittedValues = guideFile ? { ...generationValues, continuity_video: guideFile, continuity_frames: getAIShotGuideFrames(shot) } : generationValues
+    const files = await request<ShotFile[]>('capcut:run-workflow' as never,
+      { id: moduleId, values: submittedValues, settings: project.settings, projectId }, [], 24 * 60 * 60 * 1000, progress)
     if (!current()) {
       toast.success('生成已完成，可从 ComfyUI 生成结果导入原工程。')
       return
@@ -276,18 +400,12 @@ async function runTextToVideo(editor: EditorCore, shotId: string, moduleId: stri
     progress({ status: 'running', stage: '导入视频' })
     const file = files[0]
     if (!file) throw new Error('工作流未返回视频，请查看 ComfyUI 生成结果')
-    const result = await request<{ name: string; bytes: Uint8Array; mimeType: string }>('capcut:import-result' as never, { file, projectId })
-    if (!current()) return
-    const assets = await processMediaAssets({ files: [new File([result.bytes], result.name, { type: result.mimeType })] })
-    const asset = assets.find(item => item.type === 'video')
-    if (!asset) throw new Error('无法读取生成的视频，请从 ComfyUI 生成结果重新导入')
-    if (!current()) return
-    const id = await editor.media.addMediaAsset({ projectId, asset })
-    if (nativeStorageState.error) throw nativeStorageState.error
+    const imported = await importShotFile(editor, file, projectId, current)
     const latest = current()
-    if (!latest) return
-    const duration = asset.duration ?? shot.duration
-    const filled = fillDirectorGenerationPlaceholder(editor.timeline.getTracks(), [shotId],
+    if (!latest || !imported) return
+    const { id } = imported
+    const duration = imported.duration ?? shot.duration
+    const filled = combinedSlotId ? null : fillDirectorGenerationPlaceholder(editor.timeline.getTracks(), [shotId],
       buildVideoElement({ mediaId: id, name: shot.title, duration, startTime: shot.startTime }), requestId)
     if (filled) editor.timeline.updateTracks(filled.tracks)
     const versionId = generateUUID()
@@ -296,7 +414,8 @@ async function runTextToVideo(editor: EditorCore, shotId: string, moduleId: stri
       durationResolution: 'actual', linkedVideoElementId: filled?.element.id, activeOutputVersionId: versionId,
       outputVersions: [...latestShot.outputVersions, { id: versionId, assetId: id, generationId: requestId, createdAt: new Date().toISOString(),
         duration, status: 'ready', linkedVideoElementId: filled?.element.id }] }))
-    toast.success(filled ? '视频已替换占位并加入素材库' : '视频已加入素材库，剪辑占位已移除')
+    if (!combinedSlotId) toast.success(filled ? '视频已替换占位并加入素材库' : '视频已加入素材库，剪辑占位已移除')
+    return file
   } catch (error) {
     const latest = current()
     if (latest) {

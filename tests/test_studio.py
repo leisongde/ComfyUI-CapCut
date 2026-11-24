@@ -247,6 +247,53 @@ class StudioTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(response.headers["X-CapCut-Elapsed"], "0.25")
         self.assertFalse(list((self.directory / "user").rglob("*.tmp")))
 
+    async def test_export_normalizes_geometry_and_missing_audio_and_keeps_file_order(self):
+        import av
+        import shutil
+        ai_video = studio.ai_video
+
+        if not shutil.which('ffmpeg'):
+            self.skipTest('requires FFmpeg')
+        output = self.directory / 'output'
+        output.mkdir()
+        first = output / 'first.mp4'
+        second = output / 'second.mp4'
+        await asyncio.to_thread(ai_video.run_ffmpeg, ['-f', 'lavfi', '-i', 'color=red:s=160x96:r=24:d=1',
+            '-f', 'lavfi', '-i', 'sine=frequency=660:duration=1', '-c:v', 'libx264', '-c:a', 'aac', str(first)], 30)
+        await asyncio.to_thread(ai_video.run_ffmpeg, ['-f', 'lavfi', '-i', 'color=blue:s=96x160:r=30:d=1',
+            '-c:v', 'libx264', str(second)], 30)
+        # Guide extraction uses the actual previous tail and can run on silent clips.
+        pixels, samples = await asyncio.to_thread(ai_video.guide_tail, first, 64, 64)
+        self.assertEqual(len(pixels), 22 * 64 * 64 * 3)
+        self.assertGreater(pixels[0], 180)
+        self.assertEqual(len(samples), 44_000 * 2 * 4)
+        _, no_samples = await asyncio.to_thread(ai_video.guide_tail, second, 64, 64)
+        self.assertIsNone(no_samples)
+        for count in (5, 39, 56):
+            with self.subTest(guide_frames=count):
+                pixels, samples = await asyncio.to_thread(ai_video.guide_tail, first, 64, 64, count)
+                self.assertEqual(len(pixels), count * 64 * 64 * 3)
+                self.assertGreater(pixels[0], 180)
+                self.assertEqual(len(samples), round(count / 24 * 48000) * 2 * 4)
+        files = [{'filename': path.name, 'type': 'output'} for path in [first, second]]
+        with patch.object(api.folder_paths, 'get_directory_by_type', return_value=str(output), create=True), \
+             patch.object(api.folder_paths, 'get_output_directory', return_value=str(output), create=True):
+            merged = await self.op('capcut:concat-ai-shots', {'files': files})
+            response = await self.client.post('/capcut/studio/op/capcut:concat-ai-shots', json={'files': [files[0], {**files[1], 'filename': '../second.mp4'}]})
+            self.assertEqual(response.status, 400)
+        result = output / merged['subfolder'] / merged['filename']
+        with av.open(str(result)) as media:
+            frames = list(media.decode(video=0))
+            self.assertEqual(len(frames), 48)
+            self.assertEqual((frames[0].width, frames[0].height), (160, 96))
+            self.assertGreater(frames[0].to_ndarray(format='rgb24')[48, 80, 0], 180)
+            self.assertGreater(frames[-1].to_ndarray(format='rgb24')[48, 80, 2], 180)
+            self.assertEqual(len(media.streams.audio), 1)
+        with av.open(str(result)) as media:
+            audio = list(media.decode(audio=0))
+            self.assertAlmostEqual(sum(frame.samples for frame in audio) / 48000, 2, delta=0.03)
+            self.assertLess(float(abs(audio[-2].to_ndarray()).max()), 0.005)
+
 
 if __name__ == "__main__":
     unittest.main()
