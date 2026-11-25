@@ -87,6 +87,22 @@ export interface EditingProjectDocument {
   agentMessages?: unknown[]
   directorPlanning?: EditingDirectorPlanningState
   directorLibrary?: EditingDirectorLibraryItem[]
+  cover?: EditingProjectCover
+}
+
+export interface EditingProjectCover {
+  sourceAssetId: string
+  origin: 'frame' | 'image'
+  time?: number
+  fit: 'contain' | 'cover'
+  zoom: number
+  offsetX: number
+  offsetY: number
+  title: string
+  titleColor: string
+  titleSize: number
+  titleX: number
+  titleY: number
 }
 
 export type EditingDirectorTaskType = 't2v' | 'i2v' | 'fl2v' | 'r2v' | 'v2v' | 'rv2v'
@@ -167,6 +183,8 @@ export interface EditingDirectorShot {
   /** AI timeline seam preference, separate from imported Director scene settings. */
   aiTrackTransition?: 'guide' | 'cut'
   aiTrackGuideFrames?: number
+  /** Uploaded or materialized video whose ending supplies the continuation guide. */
+  guideSourceAssetId?: string
   videoClipId?: string
   imageAssetId?: string
   firstFrameAssetId?: string

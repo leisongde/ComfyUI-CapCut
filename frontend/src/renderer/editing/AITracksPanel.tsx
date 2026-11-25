@@ -93,17 +93,18 @@ export function AITracksPanel() {
 
   useEffect(() => {
     const openSourceDraft = (event: Event) => {
-      const { sceneId } = (event as CustomEvent<DirectorExpandRequest>).detail
-      const scene = getDirectorPlanning(editor.project.getActive())?.scenes.find(scene => scene.id === sceneId)
+      const detail = (event as CustomEvent<DirectorExpandRequest>).detail
+      const scene = getDirectorPlanning(editor.project.getActive())?.scenes.find(scene => scene.id === detail.sceneId)
       const characterSwap = scene?.settings.task_type === 'CharacterSwap'
       const bodyRender = scene?.settings.task_type === 'BodyRender'
       const relayVSR = scene?.settings.task_type === 'RelayVSR'
       const motionTransfer = scene?.settings.task_type === 'MotionTransfer'
-      const shot = scene?.shots.find(shot => shot.taskType === 'i2v' || shot.taskType === 'fl2v' || shot.taskType === 'v2v' || (shot.taskType === 'r2v' && (characterSwap || bodyRender || motionTransfer || relayVSR)))
+      const requestedShot = detail.shotId ? scene?.shots.find(shot => shot.id === detail.shotId) : undefined
+      const shot = requestedShot ?? scene?.shots.find(shot => shot.taskType === 'i2v' || shot.taskType === 'fl2v' || shot.taskType === 'v2v' || shot.taskType === 't2v' || (shot.taskType === 'r2v' && (characterSwap || bodyRender || motionTransfer || relayVSR)))
       if (!shot) return
       setEditingShotId(shot.id)
       const referenceEdit = scene?.settings.task_type === 'V2VARef'
-      setGenerationMode(relayVSR ? 'RelayVSR' : motionTransfer ? 'MotionTransfer' : bodyRender ? 'BodyRender' : characterSwap ? 'CharacterSwap' : shot.taskType === 'v2v' ? referenceEdit ? 'V2VARef' : 'V2VA' : shot.taskType === 'fl2v' ? 'FL2VA' : 'I2VA')
+      setGenerationMode(detail.mode ?? (relayVSR ? 'RelayVSR' : motionTransfer ? 'MotionTransfer' : bodyRender ? 'BodyRender' : characterSwap ? 'CharacterSwap' : shot.taskType === 'v2v' ? referenceEdit ? 'V2VARef' : 'V2VA' : shot.taskType === 'fl2v' ? 'FL2VA' : shot.taskType === 'r2v' ? 'Ref2VA' : 'T2VA'))
       setGenerationPosition({ trackIndex: shot.trackIndex ?? 0, startTime: shot.startTime })
       setSelected(shot.trackIndex ?? 0)
       setGenerationOpen(true)
@@ -382,7 +383,7 @@ export function AITracksPanel() {
         source_video: editingShot.refVideos[0]?.assetId ?? '', character_image: editingShot.refs[0]?.assetId ?? '', duration: editingShot.duration } : undefined}
       busy={busy} generationError={editingSlot?.error} onSave={saveDraft} onGenerate={generate} />
     : <TextToVideoDialog open={generationOpen} onOpenChange={setGenerationOpen} mode={generationMode} position={editingShot ? { startTime: editingShot.startTime, trackIndex: editingShot.trackIndex ?? 0 } : generationPosition}
-      draftId={editingShotId} initialValues={editingScene && editingShot ? { ...editingScene.settings, first_frame: editingShot.firstFrameAssetId ?? editingShot.imageAssetId ?? '',
+      draftId={editingShotId} guideFrames={editingShot?.guideSourceAssetId ? getAIShotGuideFrames(editingShot) : undefined} initialValues={editingScene && editingShot ? { ...editingScene.settings, first_frame: editingShot.firstFrameAssetId ?? editingShot.imageAssetId ?? '',
         last_frame: editingShot.lastFrameAssetId ?? '', ref_images: editingShot.refs.map(ref => ref.assetId), ref_videos: editingShot.refVideos.map(ref => ref.assetId),
         ref_audios: editingShot.refAudios.map(ref => ref.assetId), prompt: editingShot.prompt, duration: editingShot.duration } : undefined}
       busy={busy} generationError={editingSlot?.error} onSave={saveDraft} onGenerate={generate} />}

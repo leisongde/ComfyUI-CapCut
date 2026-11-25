@@ -64,12 +64,17 @@ async function resolveShotGuide(
   projectId: string,
   completed?: Map<string, ShotFile>
 ) {
-  if (!previous) return
   const warn = (reason: string) => toast.warning(`${shot.title}将按硬切生成`, { description: reason })
   if (!supportsAIShotGuide(values)) {
     warn('段间引导适用于文生视频和多参考生视频的基础采样')
     return
   }
+  if (shot.guideSourceAssetId) {
+    const file = await request<ShotFile | null>('capcut:shot-guide-file', { projectId, assetId: shot.guideSourceAssetId })
+    if (!file) throw new Error('找不到视频结尾引导素材，请重新创建续接片段')
+    return file
+  }
+  if (!previous) return
   const generated = completed?.get(previous.id)
   if (generated) return generated
   const version = previous.outputVersions.find(item => item.id === previous.activeOutputVersionId && item.status === 'ready')
@@ -262,6 +267,8 @@ export function saveTextToVideoDraft(planning: EditingDirectorPlanningState, pos
   const bodyRender = values.task_type === 'BodyRender'
   const taskType = values.task_type === 'V2VA' || referenceEdit ? 'v2v' : values.task_type === 'Ref2VA' || characterSwap || bodyRender || motionTransfer || relayVSR ? 'r2v' : values.task_type === 'FL2VA' ? 'fl2v' : values.task_type === 'I2VA' ? 'i2v' : 't2v'
   const title = relayVSR ? 'Relay VSR 视频放大' : motionTransfer ? '动作迁移' : bodyRender ? '视频转白模' : characterSwap ? '人物替换' : referenceEdit ? '视频+参考修改' : { t2v: '文生视频', i2v: '图生视频', fl2v: '首尾帧生视频', r2v: '多参考生视频', v2v: '视频编辑' }[taskType]
+  const continuityFrames = Number(values.continuity_frames)
+  const guideFrameUpdate = Number.isFinite(continuityFrames) ? { aiTrackGuideFrames: continuityFrames } : {}
   const firstFrame = typeof values.first_frame === 'string' ? values.first_frame || undefined : undefined
   const imageAssetId = taskType === 'i2v' ? firstFrame : undefined
   const firstFrameAssetId = taskType === 'fl2v' ? firstFrame : undefined
@@ -285,7 +292,7 @@ export function saveTextToVideoDraft(planning: EditingDirectorPlanningState, pos
   next = { ...next, selectedShotId: shotId, scenes: next.scenes.map(scene => scene.id === shot.sceneId
     ? { ...scene, title, settings: { ...scene.settings, ...settings, directorTaskType: taskType, duration } } : scene) }
   const prompt = motionTransfer || relayVSR ? '' : String(bodyRender ? values.subject_prompt ?? '' : values.prompt ?? '')
-  return updateDirectorShot(next, shotId, { title, taskType, imageAssetId, firstFrameAssetId, lastFrameAssetId, refs, refVideos, refAudios, prompt, duration, targetDuration: duration,
+  return updateDirectorShot(next, shotId, { title, taskType, imageAssetId, firstFrameAssetId, lastFrameAssetId, refs, refVideos, refAudios, prompt, duration, targetDuration: duration, ...guideFrameUpdate,
     sourceSnapshot: { ...shot.sourceSnapshot, duration, imageAssetId: imageAssetId ?? null, firstFrameAssetId: firstFrameAssetId ?? null,
       lastFrameAssetId: lastFrameAssetId ?? null, refs, refVideos, refAudios, prompt } })
 }
@@ -297,10 +304,11 @@ export async function generateTextToVideo(editor: EditorCore, shotId: string, mo
   const planning = getDirectorPlanning(project)
   const shot = planning && findDirectorShot(planning, shotId)
   if (!shot) throw new Error('AI 片段已移除')
-  if (planning?.aiTrackGuideEnabled !== true || shot.aiTrackTransition === 'cut') {
+  const hasExternalGuide = Boolean(shot.guideSourceAssetId)
+  if (!hasExternalGuide && (planning?.aiTrackGuideEnabled !== true || shot.aiTrackTransition === 'cut')) {
     return runTextToVideo(editor, shotId, moduleId, values)
   }
-  const previous = getAIShotPredecessors(planning.scenes.flatMap(scene => scene.shots), project.settings.fps).get(shotId)
+  const previous = hasExternalGuide ? undefined : getAIShotPredecessors(planning.scenes.flatMap(scene => scene.shots), project.settings.fps).get(shotId)
   shotQueueActive = true
   try {
     const guideFile = await resolveShotGuide(shot, previous, values, project.metadata.id)

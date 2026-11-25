@@ -9,6 +9,7 @@ import { MediaUpload } from './MediaUpload'
 import { SamplingOptions } from './SamplingOptions'
 import { PromptEditor, type PromptReference } from './PromptEditor'
 import type { GenerationMode, GenerationPosition } from './text-to-video'
+import { AI_SHOT_GUIDE_FRAMES } from './ai-shot-output'
 
 type Field = { name: string; label: string; default: unknown; options?: Array<string | { value: string; label: string }> }
 type Module = { id: string; nodeType: string; fields: Field[] }
@@ -26,13 +27,14 @@ const frameFields = [
   { name: 'last_frame', label: '尾帧图片', description: '视频的结束画面。' }
 ] as const
 
-export function TextToVideoDialog({ open, onOpenChange, mode, position, draftId, initialValues, busy, generationError, onSave, onGenerate }: {
+export function TextToVideoDialog({ open, onOpenChange, mode, position, draftId, initialValues, guideFrames, busy, generationError, onSave, onGenerate }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   mode: Exclude<GenerationMode, 'CharacterSwap' | 'BodyRender' | 'MotionTransfer'>
   position: GenerationPosition
   draftId?: string
   initialValues?: Record<string, unknown>
+  guideFrames?: number
   busy: boolean
   generationError?: string
   onSave: (values: Record<string, unknown>) => void
@@ -81,7 +83,7 @@ export function TextToVideoDialog({ open, onOpenChange, mode, position, draftId,
     setLoadingModels(false)
     setUploading(false)
     setModels([])
-    setValues({ enhance_prompt: 'on', ...initialValues, task_type: mode })
+    setValues({ enhance_prompt: 'on', ...initialValues, ...(guideFrames !== undefined ? { continuity_frames: guideFrames } : {}), task_type: mode })
     setModule(null)
     setLoading(true)
     setError(generationError ?? '')
@@ -92,10 +94,10 @@ export function TextToVideoDialog({ open, onOpenChange, mode, position, draftId,
       const connected = modules.find(item => item.nodeType === 'CapCutMiniMaxH3Workflow')
       setModule(connected ?? null)
       if (!connected) throw new Error('请在 ComfyUI 画布将“CapCut MiniMax H3 生视频”连接到主控台，再打开面板。')
-      setValues({ ...Object.fromEntries(connected.fields.map(field => [field.name, field.default])), ...(videoEdit ? { prompt: '' } : {}), system_prompt: '不要背景音乐', enhance_prompt: 'on', ...initialValues, task_type: mode, prompt_api_key: saved.key })
+      setValues({ ...Object.fromEntries(connected.fields.map(field => [field.name, field.default])), ...(videoEdit ? { prompt: '' } : {}), system_prompt: '不要背景音乐', enhance_prompt: 'on', ...initialValues, ...(guideFrames !== undefined ? { continuity_frames: guideFrames } : {}), task_type: mode, prompt_api_key: saved.key })
     }).catch(error => { if (active) setError(error.message) }).finally(() => { if (active) setLoading(false) })
     return () => { active = false; uploadRequest.current++; modelRequest.current++ }
-  }, [open, draftId, mode])
+  }, [open, draftId, mode, guideFrames])
 
   const field = (name: string) => module?.fields.find(item => item.name === name)
   const update = (name: string, value: unknown) => setValues(previous => ({ ...previous, [name]: value }))
@@ -226,6 +228,9 @@ export function TextToVideoDialog({ open, onOpenChange, mode, position, draftId,
         <div className="text-to-video-grid">
           <label>时长（秒）<input aria-label="时长（秒）" type="number" min={4} max={15} step="any" required value={String(values.duration ?? 15)} onChange={event => update('duration', event.target.value)} /><small>4–15 秒</small></label>
           <label>画面比例<select aria-label="画面比例" value={String(values.aspect_ratio ?? '')} onChange={event => update('aspect_ratio', event.target.value)}>{field('aspect_ratio')?.options?.map(option => <option key={String(option)} value={String(option)}>{String(option)}</option>)}</select></label>
+          {guideFrames !== undefined && <label>向上读取帧数<select aria-label="向上读取帧数" value={String(values.continuity_frames ?? guideFrames)} onChange={event => update('continuity_frames', Number(event.target.value))}>
+            {AI_SHOT_GUIDE_FRAMES.map(frames => <option key={frames} value={frames}>{frames} 帧</option>)}
+          </select><small>从当前视频结尾读取上下文帧</small></label>}
         </div>
         <label>分辨率（百万像素 / MP）<input aria-label="分辨率（百万像素 / MP）" type="number" min={0.01} step="any" required value={String(values.megapixels ?? 0.4)} onChange={event => update('megapixels', event.target.value)} /><small>沿用原工作流的分辨率设置，例如 0.4 MP。</small></label>
         <SamplingOptions values={values} defaultSeed={field('seed')?.default} update={update} />

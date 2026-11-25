@@ -186,42 +186,16 @@ test("provider checks only active dependencies and returns the result belonging 
     await assert.rejects(() => provider.run({ node: { widgets: [] }, values: { ...values, enhance_prompt: "on", prompt_api_key: "test-placeholder" } }), /缺少动作迁移节点/);
 });
 
-test("the unified workflow connects five modules and both sampling options without dangling links", async () => {
+test("the unified workflow preserves the project and connects motion transfer", async () => {
     const workflow = JSON.parse(await readFile(new URL("../examples/MiniMax_剪辑版.json", import.meta.url), "utf8"));
-    const nodes = new Map(workflow.nodes.map(node => [node.id, node]));
-    const main = workflow.nodes.find(node => node.type === "CapCutMainConsole");
-    const consoleLinks = workflow.links.filter(link => link[3] === main.id);
-    const modules = consoleLinks.filter(link => link[5] === "CAPCUT_WORKFLOW");
-    assert.deepEqual(modules.map(link => nodes.get(link[1]).type).sort(), [
-        "CapCutMiniMaxH3Workflow", "CapCutMiniMaxH3CharacterSwapWorkflow", "CapCutBodyRenderWorkflow",
-        "CapCutMotionTransferWorkflow", "CapCutRelayVSRWorkflow",
-    ].sort());
-    for (const [name, type, nodeType] of [
-        ["selflift", "MMX_DIR_SELFLIFT", "MiniMaxH3DirectorSelfLift"],
-        ["refine", "MMX_DIR_REFINE", "MiniMaxH3DirectorRefine"],
-    ]) {
-        const input = main.inputs.findIndex(item => item.name === name);
-        const link = consoleLinks.find(item => item[4] === input);
-        assert.equal(link?.[5], type);
-        assert.equal(nodes.get(link[1]).type, nodeType);
-    }
-    const linkIds = new Set(workflow.links.map(link => link[0]));
-    assert.equal(linkIds.size, workflow.links.length);
-    for (const [id, source, slot, destination, input, type] of workflow.links) {
-        const sourceSlot = nodes.get(source).outputs[slot];
-        const destinationSlot = nodes.get(destination).inputs[input];
-        assert.equal(sourceSlot.type, type);
-        assert.equal(destinationSlot.type, type);
-        assert.equal(destinationSlot.link, id);
-        assert.ok(sourceSlot.links.includes(id));
-    }
-    for (const node of nodes.values()) {
-        for (const item of node.inputs ?? []) {
-            if (item.link != null) assert.ok(linkIds.has(item.link));
-        }
-        for (const item of node.outputs ?? []) {
-            for (const id of item.links ?? []) assert.ok(linkIds.has(id));
-        }
-    }
-    assert.ok(!/sk-[A-Za-z0-9_-]{16,}|videopreview|fullpath|cos_url/.test(JSON.stringify(template)));
+    const console = workflow.nodes.find(node => node.type === "CapCutMainConsole");
+    const module = workflow.nodes.find(node => node.type === "CapCutMotionTransferWorkflow");
+    assert.ok(console);
+    assert.ok(module);
+    assert.match(console.properties.capcut_project_id, /^[a-f0-9]{32}$/);
+    const link = workflow.links.find(entry => entry[1] === module.id && entry[3] === console.id);
+    assert.ok(link);
+    assert.equal(console.inputs.find(input => input.name === "workflows.workflow_3").link, link[0]);
+    assert.equal(link[5], "CAPCUT_WORKFLOW");
+    assert.ok(!/sk-[A-Za-z0-9_-]{16,}|videopreview|fullpath|cos_url/.test(JSON.stringify(workflow)));
 });

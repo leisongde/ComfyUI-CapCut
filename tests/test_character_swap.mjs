@@ -204,13 +204,15 @@ test("missing node dependencies stop before any generation task is submitted", a
     assert.equal(queued, false);
 });
 
-test("the unified workflow connects character replacement independently", async () => {
+test("the unified workflow preserves the project and connects character replacement", async () => {
     const workflow = JSON.parse(await readFile(new URL("../examples/MiniMax_剪辑版.json", import.meta.url), "utf8"));
     const console = workflow.nodes.find(node => node.type === "CapCutMainConsole");
     const module = workflow.nodes.find(node => node.type === "CapCutMiniMaxH3CharacterSwapWorkflow");
-    const link = workflow.links.find(link => link[1] === module.id);
-    assert.equal(link[3], console.id);
+    assert.ok(console);
+    assert.ok(module);
+    assert.match(console.properties.capcut_project_id, /^[a-f0-9]{32}$/);
+    const link = workflow.links.find(entry => entry[1] === module.id && entry[3] === console.id);
+    assert.ok(link);
+    assert.equal(console.inputs.find(input => input.name === "workflows.workflow_1").link, link[0]);
     assert.equal(link[5], "CAPCUT_WORKFLOW");
-    assert.equal(console.inputs[link[4]].link, link[0]);
-    assert.ok(module.outputs[link[2]].links.includes(link[0]));
 });

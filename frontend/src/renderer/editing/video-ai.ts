@@ -8,6 +8,7 @@ import { extractDirectorVideoSource } from './director-video-source'
 import { saveTextToVideoDraft } from './text-to-video'
 import {
   createCharacterReplacementScene,
+  createDirectorSceneAt,
   createEmptyDirectorTrack,
   createMotionTransferScene,
   createVideoModificationScene,
@@ -16,13 +17,16 @@ import {
   findDirectorScene,
   getDirectorPlanning,
   isDirectorSourceVideoDurationAllowed,
-  setDirectorPlanning
+  setDirectorPlanning,
+  updateDirectorShot
 } from './director-planning'
 
 export const DIRECTOR_EXPAND_REQUEST_EVENT = 'raccoon:director-expand-requested'
 
 export interface DirectorExpandRequest {
   sceneId: string
+  shotId?: string
+  mode?: 'T2VA' | 'I2VA' | 'FL2VA' | 'Ref2VA' | 'V2VA' | 'V2VARef' | 'CharacterSwap' | 'BodyRender' | 'MotionTransfer' | 'RelayVSR'
   token: number
 }
 
@@ -32,8 +36,12 @@ export function getDirectorExpandRequest(): DirectorExpandRequest | null {
   return expandRequest
 }
 
-export function requestDirectorExpansion(sceneId: string): DirectorExpandRequest {
-  expandRequest = { sceneId, token: (expandRequest?.token ?? 0) + 1 }
+export function requestDirectorExpansion(
+  sceneId: string,
+  shotId?: string,
+  mode?: DirectorExpandRequest['mode']
+): DirectorExpandRequest {
+  expandRequest = { sceneId, ...(shotId ? { shotId } : {}), ...(mode ? { mode } : {}), token: (expandRequest?.token ?? 0) + 1 }
   window.dispatchEvent(new CustomEvent(DIRECTOR_EXPAND_REQUEST_EVENT, { detail: expandRequest }))
   return expandRequest
 }
@@ -177,6 +185,76 @@ export function openVideoReferenceModificationDirector(
   options: OpenVideoDirectorOptions
 ): Promise<void> {
   return openVideoDirector(options, 'rv2v')
+}
+
+export async function openVideoContinuationDirector(options: OpenVideoDirectorOptions): Promise<void> {
+  if (options.mediaAsset.type !== 'video') {
+    toast.error('无法读取当前视频素材')
+    return
+  }
+  const { editor, mediaAsset } = options
+  if (preparingEditors.has(editor)) return
+  const projectId = editor.project.getActive().metadata.id
+  const isCurrentProject = () => editor.project.getActive()?.metadata.id === projectId
+  preparingEditors.add(editor)
+  let progressToast: string | number | undefined
+  try {
+    await flushMedia()
+    if (!isCurrentProject()) throw new Error('剪辑工程已切换，请重新选择视频片段')
+    const element = { ...options.element }
+    const fullVideo = !element.trimStart && !element.trimEnd && !element.reversed &&
+      (element.playbackRate ?? 1) === 1 && Math.abs((mediaAsset.duration ?? 0) - element.duration) < 0.001
+    let source = mediaAsset
+    if (!fullVideo) {
+      progressToast = toast.loading('正在提取选中的视频片段…')
+      const extracted = await extractDirectorVideoSource(element, mediaAsset, progress => {
+        toast.loading(`正在提取选中的视频片段… ${Math.round(progress * 100)}%`, { id: progressToast })
+      }, { maxDuration: Infinity })
+      if (!isCurrentProject()) throw new Error('剪辑工程已切换，请重新选择视频片段')
+      const id = generateUUID()
+      await storageService.saveMediaAsset({ projectId, mediaAsset: { ...extracted, id } })
+      if (!isCurrentProject()) throw new Error('剪辑工程已切换，请重新选择视频片段')
+      const { file, ...details } = extracted
+      source = createStoredMediaAsset(projectId, {
+        ...details,
+        id,
+        mimeType: file.type,
+        size: file.size,
+        lastModified: file.lastModified
+      })
+      editor.media.setAssets({ assets: [...editor.media.getAssets(), source] })
+    }
+    const planning = getDirectorPlanning(editor.project.getActive())
+    let nextPlanning = createDirectorSceneAt(planning, {
+      taskType: 't2v',
+      startTime: Math.max(0, element.startTime + element.duration),
+      trackIndex: 0,
+      duration: 15
+    })
+    const shotId = nextPlanning.selectedShotId!
+    nextPlanning = updateDirectorShot(nextPlanning, shotId, {
+      guideSourceAssetId: source.id,
+      aiTrackTransition: 'cut',
+      aiTrackGuideFrames: 22
+    })
+    const scene = findDirectorScene(nextPlanning, shotId)
+    if (!scene) throw new Error('无法创建续接视频片段')
+    setDirectorPlanning(editor, nextPlanning)
+    editor.playback.seek({ time: Math.max(0, element.startTime + element.duration) })
+    editor.selection.clearSelection()
+    requestDirectorExpansion(scene.id, shotId, 'T2VA')
+    toast.success('已创建视频结尾续接片段', {
+      id: progressToast,
+      description: '请填写提示词和参数，生成时会读取当前视频结尾作为上下文。'
+    })
+  } catch (error) {
+    toast.error('创建视频结尾续接失败', {
+      id: progressToast,
+      description: error instanceof Error ? error.message : String(error)
+    })
+  } finally {
+    preparingEditors.delete(editor)
+  }
 }
 
 export function openCharacterReplacementDirector(options: OpenVideoDirectorOptions): Promise<void> {
